@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(BASE_DIR))
 
 from config import settings
-from src.data.dataset_registry import DATASET_REGISTRY, get_dataset_metadata, list_available_datasets
+from src.data.dataset_registry import DATASET_REGISTRY, get_dataset_metadata, list_available_datasets, load_feature_availability_matrix
 from src.data.kubik_loader import KubikLoader
 from src.data.lbnl_loader import LBNLLoader
 from src.data.feature_mapping import CanonicalFeatureSchema
@@ -1101,12 +1101,8 @@ elif nav_section == "Facility Dataset Specifications":
         """, unsafe_allow_html=True)
 
     st.markdown('<div class="schematic-header">Cross-Facility Feature Availability Cross-Reference</div>', unsafe_allow_html=True)
-    avail_path = settings.REPORTS_DIR / "lbnl_feature_availability.csv"
-    if avail_path.exists():
-        try:
-            avail_df = pd.read_csv(avail_path)
-            st.dataframe(avail_df, use_container_width=True, hide_index=True)
-        except Exception as e:
-            st.warning(f"Feature availability metadata is being processed ({type(e).__name__}).")
+    avail_df, err_msg = load_feature_availability_matrix()
+    if avail_df is not None:
+        st.dataframe(avail_df, use_container_width=True, hide_index=True)
     else:
-        st.info("Feature availability metadata table is not present.")
+        st.warning(f"Feature availability report is currently unavailable: {err_msg}")

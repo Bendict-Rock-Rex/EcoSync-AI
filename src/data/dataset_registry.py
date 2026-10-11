@@ -123,3 +123,40 @@ def get_dataset_metadata(dataset_id: str) -> DatasetMetadata:
 
 def list_available_datasets() -> List[str]:
     return list(DATASET_REGISTRY.keys())
+
+
+FEATURE_AVAILABILITY_COLUMNS = [
+    "Feature_Domain", "Specific_Measurement", "Available_in_KUBIK",
+    "KUBIK_Variable", "Available_in_LBNL_Bldg59", "LBNL_Variable",
+    "Cross_Building_Mapping_Status", "Notes"
+]
+
+
+def load_feature_availability_matrix(csv_path: Any = None):
+    """
+    Safely loads and validates the cross-facility feature availability matrix.
+    Returns (DataFrame, None) on success, or (None, error_message) on failure/missing.
+    Enforces complete schema validation and zero raw tracebacks.
+    """
+    import pandas as pd
+    import sys
+    sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+    from config import settings
+
+    path = Path(csv_path) if csv_path is not None else (settings.REPORTS_DIR / "lbnl_feature_availability.csv")
+    if not path.exists():
+        return None, f"Feature availability report not found at {path}."
+    
+    try:
+        # Strict parsing without on_bad_lines='skip' to ensure data integrity
+        df = pd.read_csv(path, encoding="utf-8")
+        if list(df.columns) != FEATURE_AVAILABILITY_COLUMNS:
+            return None, f"Schema mismatch: expected {FEATURE_AVAILABILITY_COLUMNS}, found {list(df.columns)}."
+        if len(df) == 0:
+            return None, "Feature availability report contains zero records."
+        if df["Specific_Measurement"].duplicated().any():
+            return None, "Duplicate entries detected in feature availability report."
+        return df, None
+    except Exception as e:
+        return None, f"Feature availability report parsing failed: {type(e).__name__} ({str(e)})"
+

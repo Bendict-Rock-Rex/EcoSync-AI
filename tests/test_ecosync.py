@@ -21,7 +21,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(BASE_DIR))
 
 from config import settings
-from src.data.dataset_registry import DATASET_REGISTRY, get_dataset_metadata, list_available_datasets
+from src.data.dataset_registry import (
+    DATASET_REGISTRY,
+    get_dataset_metadata,
+    list_available_datasets,
+    load_feature_availability_matrix,
+    FEATURE_AVAILABILITY_COLUMNS
+)
 from src.data.kubik_loader import KubikLoader
 from src.data.lbnl_loader import LBNLLoader
 from src.data.feature_mapping import CanonicalFeatureSchema
@@ -203,15 +209,50 @@ class TestEcoSyncAI(unittest.TestCase):
         self.assertIn("savings", res["all_evaluated_candidates"][0])
         self.assertEqual(res["all_evaluated_candidates"][0]["savings"]["delta_cost_pct"], 0.0)
 
-    def test_feature_availability_csv_integrity(self):
-        """Verify that lbnl_feature_availability.csv parses cleanly without ParserError."""
-        csv_path = settings.REPORTS_DIR / "lbnl_feature_availability.csv"
-        self.assertTrue(csv_path.exists(), "Feature availability CSV must exist")
-        df = pd.read_csv(csv_path)
+    def test_feature_availability_valid_schema(self):
+        """Verify that lbnl_feature_availability.csv parses cleanly with expected schema, no nulls, and no duplicates."""
+        df, err = load_feature_availability_matrix()
+        self.assertIsNone(err, f"Feature availability loader returned error: {err}")
+        self.assertIsNotNone(df, "Feature availability dataframe must not be None")
         self.assertEqual(len(df), 16, f"Expected 16 rows, got {len(df)}")
-        self.assertIn("Feature_Domain", df.columns)
-        self.assertIn("Available_in_KUBIK", df.columns)
-        self.assertIn("Available_in_LBNL_Bldg59", df.columns)
+        self.assertEqual(list(df.columns), FEATURE_AVAILABILITY_COLUMNS)
+        self.assertEqual(df.isnull().sum().sum(), 0, "Feature availability matrix must contain zero null values")
+        self.assertFalse(df["Specific_Measurement"].duplicated().any(), "Specific_Measurement must not have duplicates")
+
+    def test_feature_availability_missing_file_handling(self):
+        """Verify that a missing report file returns an error message gracefully without raising an exception."""
+        non_existent = settings.REPORTS_DIR / "non_existent_report.csv"
+        df, err = load_feature_availability_matrix(non_existent)
+        self.assertIsNone(df, "DataFrame must be None when file does not exist")
+        self.assertIsNotNone(err, "Error message must be returned when file does not exist")
+        self.assertIn("not found", err)
+
+    def test_feature_availability_malformed_csv_handling(self):
+        """Verify that a malformed CSV with inconsistent commas returns an error message without crashing."""
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".csv") as tmp:
+            tmp.write("Col1,Col2\nVal1\nVal1,Val2,Val3,Extra\n")
+            tmp_path = Path(tmp.name)
+        try:
+            df, err = load_feature_availability_matrix(tmp_path)
+            self.assertIsNone(df, "DataFrame must be None on malformed CSV")
+            self.assertIsNotNone(err, "Error message must describe parsing or schema failure")
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    def test_feature_availability_schema_mismatch_handling(self):
+        """Verify that a CSV with incorrect columns is detected as a schema mismatch."""
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".csv") as tmp:
+            tmp.write("WrongCol1,WrongCol2\nA,B\n")
+            tmp_path = Path(tmp.name)
+        try:
+            df, err = load_feature_availability_matrix(tmp_path)
+            self.assertIsNone(df, "DataFrame must be None on schema mismatch")
+            self.assertIsNotNone(err, "Error message must report schema mismatch")
+            self.assertIn("Schema mismatch", err)
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
     def test_power_factor_standby_vs_load_diagnostics(self):
         """Verify that PF near 0.13 in standby does not trigger a false utility penalty warning."""
