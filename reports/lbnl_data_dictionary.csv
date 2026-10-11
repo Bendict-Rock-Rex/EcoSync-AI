@@ -1,0 +1,45 @@
+Category,File_Name,Column_Name,Description,Unit,Sampling_Frequency,Raw_Missing_Rate
+Energy use data,ele.csv,mels_S,Miscellaneous electric load for the South Wing,kW,15 min,0.32920657113717056
+Energy use data,ele.csv,mels_N,Miscellaneous electric load for the North Wing,kW,15 min,0.19687564443251993
+Energy use data,ele.csv,lig_S +,Lighting load for the South Wing,kW,15 min,0.18165896940360587
+Energy use data,ele.csv,hvac_S,Heating Ventilation and Air Conditioning load for the Sorth Wing,kW,15 min,0.08100638516126434
+Energy use data,ele.csv,hvac_N,Heating Ventilation and Air Conditioning load for the Nouth Wing,kW,15 min,0.08105390771420433
+Outdoor environmental data,site_weather.csv,air_temp_set_1,Outdoor air temperature from sensor 1,°C,15 min,0.0034404915478121927
+Outdoor environmental data,site_weather.csv,air_temp_set_2,Outdoor air temperature from sensor 2,°C,15 min,0.004647506806839521
+Outdoor environmental data,site_weather.csv,dew_point_temperature,Outdoor air dew temperature of sensor 2,°C,15 min,0.011043721960897335
+Outdoor environmental data,site_weather.csv,relative_humidity_set_1,Outdoor air relative humidity from sensor 1,%,15 min,0.009104881013868051
+Outdoor environmental data,site_weather.csv,solar_radiation_set_1,Outdoor solar radiation from sensor 1,W/m2,15 min,0.009332978795315316
+Indoor environmental data,zone_temp_sp_c.csv,zone_*_cooling_sp,Cooling temperature setpoint of Zone *,°F,5 min,0.05-0.07
+Indoor environmental data,zone_temp_sp_h.csv,zone_*_heating_sp,Heating temperature setpoint of Zone *,°F,5 min,0.05-0.06
+Indoor environmental data,zone_temp_interior.csv,cerc_templogger_*,Zone temperature of interior zone,°F,10 min,0.01-0.21
+Indoor environmental data,zone_temp_exterior.csv,zone_*_temp,Zone temperature of exterior zone,°F,1 min,0.15-0.20
+Indoor environmental data,zone_co2.csv,zone_*_co2,CO2 concentration of each zone,ppm,1 min,0-0.1
+HVAC operational data,hp_hws_temp.csv,hp_hws_temp,Heat pump heating water supply temperature,°F,1 min,0.13839127858602
+HVAC operational data,rtu_sa_t_sp.csv,rtu_*_sat_sp_tn,"Roof Top Unit * supply air temperature setpoint (*: 001, 002, 003, 004)",°F,1 min,0.15
+HVAC operational data,rtu_sa_t.csv,rtu_*_sa_temp,"Roof Top Unit * supply air temperature (*: 001, 002, 003, 004)",°F,1 min,0.14
+HVAC operational data,rtu_ra_t.csv,rtu_*_ra_temp,"Roof Top Unit * return air temperature (*: 001, 002, 003, 004)",°F,1 min,0.14
+HVAC operational data,rtu_ma_t.csv,rtu_*_ma_temp,"Roof Top Unit * mixed air temperature (*: 001, 002, 003, 004)",°F,1 min,0.14
+HVAC operational data,rtu_oa_t.csv,rtu_*_oa_temp,"Roof Top Unit * outdoor air temperature (*: 001, 002, 003, 004)",°F,1 min,0.14
+HVAC operational data,rtu_sa_fr.csv,rtu_*_fltrd_sa_flow_tn,"Roof Top Unit * filtered supply air flow rate (*: 001, 002, 003, 004)",CFM,1 min,0.14
+HVAC operational data,rtu_oa_fr.csv,rtu_*_oa_flow_tn,"Roof Top Unit * outdoor air flow rate (*: 001, 002, 003, 004)",CFM,1 min,0.02
+HVAC operational data,rtu_oa_damper.csv,rtu_*_oadmpr_pct,"Roof Top Unit * outdoor air damper position (*: 001, 002, 003, 004)",%,1 min,0.15
+HVAC operational data,rtu_econ_sp.csv,rtu_*_econ_stpt_tn,"Roof Top Unit * economizer setpoint (*: 001, 002, 003, 004)",°F,1 min,0.14
+HVAC operational data,rtu_sa_p_sp.csv,rtu_*_pa_static_stpt_tn,"Roof Top Unit * air pressure static setpoint (*: 001, 002, 003, 004)",psi,1 min,0.15
+HVAC operational data,rtu_plenum_p.csv,rtu_*_fltrd_**_plenum_press_tn,"Roof Top Unit * plenum air pressure at floor ** (*: 001, 002, 003, 004; **: gnd_lvl, lvl2)",psi,1 min,0.14
+HVAC operational data,rtu_fan_spd.csv,rtu_*_sf_vfd_spd_fbk_tn,"Roof Top Unit * supply fan speed (*: 001, 002, 003, 004)",%,1 min,0.14
+HVAC operational data,rtu_fan_spd.csv,rtu_*_rf_vfd_spd_fbk_tn,"Roof Top Unit * return fan speed (*: 001, 002, 003, 004)",%,1 min,0.14
+HVAC operational data,ashp_meter.csv,aru_001_power_mbtuph,Heat meter for air source heat pump,mbtuph,5 min,0.29
+HVAC operational data,ashp_cw.csv,aru_001_cws_temp,Chilled water supply temperature,°F,5 min,0.01
+HVAC operational data,ashp_cw.csv,aru_001_cwr_temp,Chilled water return temperature,°F,5 min,0.009390845630869279
+HVAC operational data,ashp_cw.csv,aru_001_cws_fr_gpm,Chilled water fow rate,CFM,5 min,0.02
+HVAC operational data,ashp_hw.csv,aru_001_hws_temp,Hot water supply temperature,°F,5 min,0.16
+HVAC operational data,ashp_hw.csv,aru_001_hwr_temp,Hot water return temperature,°F,5 min,0.16
+HVAC operational data,ashp_hw.csv,aru_001_hws_fr_gpm,Hot water fow rate,CFM,5 min,0.0135
+HVAC operational data,uft_fan_spd.csv,zone_*_fan_spd,Supply air fan speed of Zone * ,%,1 min,0.15-0.23
+HVAC operational data,uft_hw_valve.csv,zone_*_hw_valve,Heating water valve position of Zone * ,%,1 min,0.15-0.25
+Occupant data,occ.csv,occ_third_south,Occupant counts in the south half of third floor,/,1 min,0.0004
+Occupant data,occ.csv,occ_fourth_south,Occupant counts in the south half of forth floor,/,1 min,0.0004
+Occupant data,wifi.csv,wifi_first_south,Wifi connection counts in the south half of first floor,/,10 min,0
+Occupant data,wifi.csv,wifi_second_south,Wifi connection counts in the south half of second floor,/,10 min,0
+Occupant data,wifi.csv,wifi_third_south,Wifi connection counts in the south half of third floor,/,10 min,0
+Occupant data,wifi.csv,wifi_fourth_south,Wifi connection counts in the south half of forth floor,/,10 min,0

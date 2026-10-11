@@ -1,0 +1,354 @@
+{
+  "METEO_RoofSR_Global.PV": {
+    "subsystem": "Weather station",
+    "description": "Global horizontal radiation"
+  },
+  "METEO_GardenWS_AT.PV": {
+    "subsystem": "Weather station",
+    "description": "Outdoor dry bulb temperature"
+  },
+  "F0N2_FCM1.Enable": {
+    "subsystem": "FANCOIL 1",
+    "description": "Fancoil1 enabled"
+  },
+  "F0N2_FCM1.PV": {
+    "subsystem": "FANCOIL 1",
+    "description": "Fancoil1 thermostat reading"
+  },
+  "F0N2_FCM1.SP": {
+    "subsystem": "FANCOIL 1",
+    "description": "Fancoil1 thermostat setpoint"
+  },
+  "F0N2_FCM1.ST_COOL_Mode": {
+    "subsystem": "FANCOIL 1",
+    "description": "fancoil on cooling mode"
+  },
+  "F0N2_FCM1.ST_HOT_Mode": {
+    "subsystem": "FANCOIL 1",
+    "description": "fancoil on heating mode"
+  },
+  "F0N2_FCM1.ST_VENT_Mode": {
+    "subsystem": "FANCOIL 1",
+    "description": "fancoil on fan mode"
+  },
+  "F0N2_FCM1_C5.PV": {
+    "subsystem": "FANCOIL 1",
+    "description": "inlet water flow"
+  },
+  "F0N2_FCM1_ST1.PV": {
+    "subsystem": "FANCOIL 1",
+    "description": "inlet water temperature"
+  },
+  "F0N2_FCM1_ST2.PV": {
+    "subsystem": "FANCOIL 1",
+    "description": "outlet water temperature"
+  },
+  "F0N2_FCM1_W5.kWh": {
+    "subsystem": "FANCOIL 1",
+    "description": "cumulative thermal supply"
+  },
+  "F0N2_FCM1_W5.kWh_AC": {
+    "subsystem": "FANCOIL 1",
+    "description": "cumulative heat"
+  },
+  "F0N2_FCM1_W5.kWh_AF": {
+    "subsystem": "FANCOIL 1",
+    "description": "cumulative cold"
+  },
+  "F0N2_FCM1_W5.W": {
+    "subsystem": "FANCOIL 1",
+    "description": "thermal power"
+  },
+  "F0N2_FCM2.Enable": {
+    "subsystem": "FANCOIL 2",
+    "description": "Fancoil2 enabled"
+  },
+  "F0N2_FCM2.PV": {
+    "subsystem": "FANCOIL 2",
+    "description": "Fancoil2 thermostat reading"
+  },
+  "F0N2_FCM2.SP": {
+    "subsystem": "FANCOIL 2",
+    "description": "Fancoil2 thermostat setpoint"
+  },
+  "F0N2_FCM2.ST_COOL_Mode": {
+    "subsystem": "FANCOIL 2",
+    "description": "fancoil on cooling mode"
+  },
+  "F0N2_FCM2.ST_HOT_Mode": {
+    "subsystem": "FANCOIL 2",
+    "description": "fancoil on heating mode"
+  },
+  "F0N2_FCM2.ST_VENT_Mode": {
+    "subsystem": "FANCOIL 2",
+    "description": "fancoil on fan mode"
+  },
+  "F0N2_FCM2_C6.PV": {
+    "subsystem": "FANCOIL 2",
+    "description": "inlet water flow"
+  },
+  "F0N2_FCM2_ST1.PV": {
+    "subsystem": "FANCOIL 2",
+    "description": "inlet water temperature"
+  },
+  "F0N2_FCM2_ST2.PV": {
+    "subsystem": "FANCOIL 2",
+    "description": "outlet water temperature"
+  },
+  "F0N2_FCM2_W6.kWh": {
+    "subsystem": "FANCOIL 2",
+    "description": "cumulative thermal supply"
+  },
+  "F0N2_FCM2_W6.kWh_AC": {
+    "subsystem": "FANCOIL 2",
+    "description": "cumulative heat"
+  },
+  "F0N2_FCM2_W6.kWh_AF": {
+    "subsystem": "FANCOIL 2",
+    "description": "cumulative cold"
+  },
+  "F0N2_FCM2_W6.W": {
+    "subsystem": "FANCOIL 2",
+    "description": "thermal power"
+  },
+  "HVAC_BP301.OUT": {
+    "subsystem": "CHILLER 1",
+    "description": "Impulsion pump to distribution order"
+  },
+  "HVAC_CP301.PV": {
+    "subsystem": "CHILLER 1",
+    "description": "Outlet cold water flow"
+  },
+  "HVAC_ENF1_CVM.Hz": {
+    "subsystem": "CHILLER 1",
+    "description": "Frequency"
+  },
+  "HVAC_ENF1_CVM.I_III": {
+    "subsystem": "CHILLER 1",
+    "description": "Average Intensity"
+  },
+  "HVAC_ENF1_CVM.IR": {
+    "subsystem": "CHILLER 1",
+    "description": "Intensity phase R"
+  },
+  "HVAC_ENF1_CVM.IS": {
+    "subsystem": "CHILLER 1",
+    "description": "Intensity phase S"
+  },
+  "HVAC_ENF1_CVM.IT": {
+    "subsystem": "CHILLER 1",
+    "description": "Intensity phase T"
+  },
+  "HVAC_ENF1_CVM.kVArh_in": {
+    "subsystem": "CHILLER 1",
+    "description": "Reactive Energy (R+)"
+  },
+  "HVAC_ENF1_CVM.kVArh_out": {
+    "subsystem": "CHILLER 1",
+    "description": "Reactive Energy (R-)"
+  },
+  "HVAC_ENF1_CVM.kWh_in": {
+    "subsystem": "CHILLER 1",
+    "description": "Active Energy A+)"
+  },
+  "HVAC_ENF1_CVM.kWh_out": {
+    "subsystem": "CHILLER 1",
+    "description": "Active Energy (A-)"
+  },
+  "HVAC_ENF1_CVM.PF_III": {
+    "subsystem": "CHILLER 1",
+    "description": "Power factor (average)"
+  },
+  "HVAC_ENF1_CVM.PF_R": {
+    "subsystem": "CHILLER 1",
+    "description": "Power factor phase R"
+  },
+  "HVAC_ENF1_CVM.PF_S": {
+    "subsystem": "CHILLER 1",
+    "description": "Power factor phase S"
+  },
+  "HVAC_ENF1_CVM.PF_T": {
+    "subsystem": "CHILLER 1",
+    "description": "Power factor phase T"
+  },
+  "HVAC_ENF1_CVM.V_III": {
+    "subsystem": "CHILLER 1",
+    "description": "Combined Voltage"
+  },
+  "HVAC_ENF1_CVM.VA": {
+    "subsystem": "CHILLER 1",
+    "description": "Apparent Power"
+  },
+  "HVAC_ENF1_CVM.VAr": {
+    "subsystem": "CHILLER 1",
+    "description": "Reactive Power"
+  },
+  "HVAC_ENF1_CVM.VRS": {
+    "subsystem": "CHILLER 1",
+    "description": "Phases R-S combined voltage"
+  },
+  "HVAC_ENF1_CVM.VST": {
+    "subsystem": "CHILLER 1",
+    "description": "Phases S-T combined voltage"
+  },
+  "HVAC_ENF1_CVM.VTR": {
+    "subsystem": "CHILLER 1",
+    "description": "Phases T-R combined voltage"
+  },
+  "HVAC_ENF1_CVM.W": {
+    "subsystem": "CHILLER 1",
+    "description": "Active Power"
+  },
+  "HVAC_ENF1_m.OUT": {
+    "subsystem": "CHILLER 1",
+    "description": "Turning on order"
+  },
+  "HVAC_Enfriadora1.SP": {
+    "subsystem": "CHILLER 1",
+    "description": "Control setpoint"
+  },
+  "HVAC_SP301.PV": {
+    "subsystem": "CHILLER 1",
+    "description": "Cold water outlet"
+  },
+  "HVAC_SP302.PV": {
+    "subsystem": "CHILLER 1",
+    "description": "Cold water inlet"
+  },
+  "HVAC_WP301.kWh": {
+    "subsystem": "CHILLER 1",
+    "description": "Cumulative thermal energy produced (cold)"
+  },
+  "HVAC_WP301.W": {
+    "subsystem": "CHILLER 1",
+    "description": "Thermal power (cold)"
+  },
+  "HVAC_BP401.OUT": {
+    "subsystem": "CHILLER 2",
+    "description": "Impulsion pump to distribution order"
+  },
+  "HVAC_CP401.PV": {
+    "subsystem": "CHILLER 2",
+    "description": "Outlet cold water flow"
+  },
+  "HVAC_ENF2_CVM.Hz": {
+    "subsystem": "CHILLER 2",
+    "description": "Frequency"
+  },
+  "HVAC_ENF2_CVM.I_III": {
+    "subsystem": "CHILLER 2",
+    "description": "Average Intensity"
+  },
+  "HVAC_ENF2_CVM.IR": {
+    "subsystem": "CHILLER 2",
+    "description": "Intensity phase R"
+  },
+  "HVAC_ENF2_CVM.IS": {
+    "subsystem": "CHILLER 2",
+    "description": "Intensity phase S"
+  },
+  "HVAC_ENF2_CVM.IT": {
+    "subsystem": "CHILLER 2",
+    "description": "Intensity phase T"
+  },
+  "HVAC_ENF2_CVM.kVArh_in": {
+    "subsystem": "CHILLER 2",
+    "description": "Reactive Energy (R+)"
+  },
+  "HVAC_ENF2_CVM.kVArh_out": {
+    "subsystem": "CHILLER 2",
+    "description": "Reactive Energy (R-)"
+  },
+  "HVAC_ENF2_CVM.kWh_in": {
+    "subsystem": "CHILLER 2",
+    "description": "Active Energy A+)"
+  },
+  "HVAC_ENF2_CVM.kWh_out": {
+    "subsystem": "CHILLER 2",
+    "description": "Active Energy (A-)"
+  },
+  "HVAC_ENF2_CVM.PF_III": {
+    "subsystem": "CHILLER 2",
+    "description": "Power factor (average)"
+  },
+  "HVAC_ENF2_CVM.PF_R": {
+    "subsystem": "CHILLER 2",
+    "description": "Power factor phase R"
+  },
+  "HVAC_ENF2_CVM.PF_S": {
+    "subsystem": "CHILLER 2",
+    "description": "Power factor phase S"
+  },
+  "HVAC_ENF2_CVM.PF_T": {
+    "subsystem": "CHILLER 2",
+    "description": "Power factor phase T"
+  },
+  "HVAC_ENF2_CVM.V_III": {
+    "subsystem": "CHILLER 2",
+    "description": "Combined Voltage"
+  },
+  "HVAC_ENF2_CVM.VA": {
+    "subsystem": "CHILLER 2",
+    "description": "Apparent Power"
+  },
+  "HVAC_ENF2_CVM.VAr": {
+    "subsystem": "CHILLER 2",
+    "description": "Reactive Power"
+  },
+  "HVAC_ENF2_CVM.VRS": {
+    "subsystem": "CHILLER 2",
+    "description": "Phases R-S combined voltage"
+  },
+  "HVAC_ENF2_CVM.VST": {
+    "subsystem": "CHILLER 2",
+    "description": "Phases S-T combined voltage"
+  },
+  "HVAC_ENF2_CVM.VTR": {
+    "subsystem": "CHILLER 2",
+    "description": "Phases T-R combined voltage"
+  },
+  "HVAC_ENF2_CVM.W": {
+    "subsystem": "CHILLER 2",
+    "description": "Active Power"
+  },
+  "HVAC_ENF2_m.OUT": {
+    "subsystem": "CHILLER 2",
+    "description": "Turning on order"
+  },
+  "HVAC_Enfriadora2.SP": {
+    "subsystem": "CHILLER 2",
+    "description": "Control setpoint"
+  },
+  "HVAC_SP401.PV": {
+    "subsystem": "CHILLER 2",
+    "description": "Cold water outlet"
+  },
+  "HVAC_SP402.PV": {
+    "subsystem": "CHILLER 2",
+    "description": "Cold water inlet"
+  },
+  "HVAC_WP401.kWh": {
+    "subsystem": "CHILLER 2",
+    "description": "Cumulative thermal energy produced (cold)"
+  },
+  "HVAC_WP401.W": {
+    "subsystem": "CHILLER 2",
+    "description": "Thermal power (cold)"
+  },
+  "HVAC_STA.PV": {
+    "subsystem": "Chillers room temperature",
+    "description": "Air temperature in the basement where chillers are located (point A)"
+  },
+  "HVAC_STB.PV": {
+    "subsystem": "Chillers room temperature",
+    "description": "Air temperature in the basement where chillers are located (point B)"
+  },
+  "HVAC_STC.PV": {
+    "subsystem": "Chillers room temperature",
+    "description": "Air temperature in the basement where chillers are located (point C)"
+  },
+  "HVAC_STD.PV": {
+    "subsystem": "Chillers room temperature",
+    "description": "Air temperature in the basement where chillers are located (point D)"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "dataset": "LBNL_BUILDING_59",
+  "target_variable": "hvac_total_kw",
+  "train_samples": 19432,
+  "test_samples": 4858,
+  "model_without_occupancy": {
+    "features": [
+      "air_temp_set_1",
+      "solar_radiation_set_1",
+      "relative_humidity_set_1",
+      "hour",
+      "sin_hour",
+      "cos_hour",
+      "is_weekend",
+      "outdoor_temp_lag1",
+      "outdoor_temp_lag3",
+      "hvac_power_lag1"
+    ],
+    "r2_score": 0.6648003681732382,
+    "mae_kw": 7.263687872406743,
+    "rmse_kw": 9.488535819544351
+  },
+  "model_with_occupancy": {
+    "features": [
+      "air_temp_set_1",
+      "solar_radiation_set_1",
+      "relative_humidity_set_1",
+      "hour",
+      "sin_hour",
+      "cos_hour",
+      "is_weekend",
+      "outdoor_temp_lag1",
+      "outdoor_temp_lag3",
+      "hvac_power_lag1",
+      "occ_total",
+      "occ_lag1"
+    ],
+    "r2_score": 0.6643351014416718,
+    "mae_kw": 7.251033861319288,
+    "rmse_kw": 9.495118716359682
+  },
+  "ablation_findings": {
+    "mae_improvement_pct": 0.17420918009878816,
+    "rmse_improvement_pct": -0.06937737223662938,
+    "r2_gain": -0.00046526673156632725,
+    "feature_importances": {
+      "air_temp_set_1": 0.07628967970036854,
+      "solar_radiation_set_1": 0.016842312242591057,
+      "relative_humidity_set_1": 0.012054222768185213,
+      "hour": 0.009092694926688565,
+      "sin_hour": 0.006711356010059963,
+      "cos_hour": 0.008966690116378025,
+      "is_weekend": 0.0009594096027377774,
+      "outdoor_temp_lag1": 0.007636170239604577,
+      "outdoor_temp_lag3": 0.009739855509831447,
+      "hvac_power_lag1": 0.8222659589116036,
+      "occ_total": 0.016029548242202877,
+      "occ_lag1": 0.013412101729748303
+    }
+  }
+}

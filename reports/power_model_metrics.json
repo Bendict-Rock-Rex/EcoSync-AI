@@ -1,0 +1,58 @@
+{
+  "best_model": "RidgeRegression",
+  "all_models": {
+    "RidgeRegression": {
+      "r2_score": 0.35457535445462296,
+      "mae_watts": 305.162382691467,
+      "rmse_watts": 386.5751176450158
+    },
+    "RandomForest": {
+      "r2_score": -0.059664890023989336,
+      "mae_watts": 349.01005439188793,
+      "rmse_watts": 495.330872136503
+    },
+    "GradientBoosting": {
+      "r2_score": 0.23867368655470111,
+      "mae_watts": 258.4805207527987,
+      "rmse_watts": 419.8523075666981
+    }
+  },
+  "features": [
+    "METEO_GardenWS_AT.PV",
+    "METEO_RoofSR_Global.PV",
+    "HVAC_Enfriadora1.SP",
+    "HVAC_Enfriadora2.SP",
+    "HVAC_ENF1_m.OUT",
+    "HVAC_ENF2_m.OUT",
+    "F0N2_FCM1.PV",
+    "F0N2_FCM2.PV",
+    "F0N2_FCM1.SP",
+    "F0N2_FCM2.SP",
+    "hour",
+    "sin_hour",
+    "cos_hour",
+    "outdoor_temp_lag1",
+    "total_chiller_power_lag1",
+    "tariff_eur_per_kwh"
+  ],
+  "feature_importances": {
+    "METEO_GardenWS_AT.PV": 34.13380304086363,
+    "METEO_RoofSR_Global.PV": 0.07646062131876169,
+    "HVAC_Enfriadora1.SP": 68.49358648960174,
+    "HVAC_Enfriadora2.SP": 117.90518029766135,
+    "HVAC_ENF1_m.OUT": 17.132941498013516,
+    "HVAC_ENF2_m.OUT": 189.71528386996545,
+    "F0N2_FCM1.PV": 36.25754221664234,
+    "F0N2_FCM2.PV": 51.58235747498953,
+    "F0N2_FCM1.SP": 4.161611110641504,
+    "F0N2_FCM2.SP": 5.7441950788428215,
+    "hour": 2.0555888435846423,
+    "sin_hour": 19.372488583048984,
+    "cos_hour": 17.880684250060593,
+    "outdoor_temp_lag1": 39.80201158420104,
+    "total_chiller_power_lag1": 0.6350336348233324,
+    "tariff_eur_per_kwh": 49.61648618882566
+  },
+  "train_samples": 14027,
+  "test_samples": 3507
+}

@@ -1,0 +1,51 @@
+{
+  "dataset_summary": {
+    "total_records": 17718,
+    "total_sensor_channels": 89,
+    "start_timestamp": "2020-07-01 00:00:00",
+    "end_timestamp": "2020-10-31 23:49:59.995000",
+    "nominal_sampling_interval_min": 10.0
+  },
+  "chiller1_statistics": {
+    "active_power_max_w": 2710.0806198299624,
+    "active_power_mean_w": 621.8187844919426,
+    "active_power_p95_w": 1511.9479528178615,
+    "thermal_power_mean_w": 325.2221868670688,
+    "empirical_cop_median": 0.20679015329758021,
+    "empirical_cop_mean": 0.6976692147623278,
+    "runtime_fraction": 0.8414606614742071,
+    "pf_min": -0.9099209449858463,
+    "pf_max": 0.0
+  },
+  "chiller2_statistics": {
+    "active_power_max_w": 2667.096452576776,
+    "active_power_mean_w": 213.77674159007063,
+    "active_power_p95_w": 1171.852786845121,
+    "thermal_power_mean_w": 72.38762341334908,
+    "empirical_cop_median": 0.32201512745188526,
+    "empirical_cop_mean": 0.5710599558577424,
+    "runtime_fraction": 0.34258945704932836,
+    "pf_min": -0.8116178243514716,
+    "pf_max": 0.11936694670082236
+  },
+  "zone_temperatures": {
+    "zone1_temp_min": 2.315845535096234,
+    "zone1_temp_mean": 25.136735193010537,
+    "zone1_temp_max": 60.04364802854011,
+    "zone2_temp_min": 2.315845535096234,
+    "zone2_temp_mean": 25.13678624313659,
+    "zone2_temp_max": 60.04364802854011,
+    "zone1_comfort_compliance_pct": 41.95733152726041,
+    "zone2_comfort_compliance_pct": 41.95733152726041
+  },
+  "null_statistics": {
+    "total_null_entries": 18599,
+    "top_null_columns": {
+      "METEO_RoofSR_Global.PV": 223,
+      "F0N2_FCM1.Enable": 219,
+      "F0N2_FCM1.PV": 219,
+      "F0N2_FCM1.SP": 219,
+      "F0N2_FCM1.ST_COOL_Mode": 219
+    }
+  }
+}

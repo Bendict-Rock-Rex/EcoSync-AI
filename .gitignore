@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Operating System & IDE Artifacts
+.DS_Store
+Thumbs.db
+ehthumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary & Execution Logs
+*.log
+logs/
+
+# Raw Bulky Datasets Excluded from GitHub Repository
+# Note: GitHub hard file limit is 100 MB. Building_59.zip is ~263 MB.
+*.zip
+**/*.zip
+doi_10_7941_D1N33Q__v20220202/Building_59.zip
+cooling july_october.xlsx
+**/cooling july_october.xlsx
+
+# Secrets & Environment Credentials (Safety Precaution)
+*.env
+secrets.toml
+.streamlit/secrets.toml
+credentials.json
