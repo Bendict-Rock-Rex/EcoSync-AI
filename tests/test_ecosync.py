@@ -143,15 +143,100 @@ class TestEcoSyncAI(unittest.TestCase):
         eval_unsafe = optimizer.evaluate_what_if(unsafe_cand, sample_state)
         self.assertFalse(eval_unsafe["is_safe"], "Candidate with 3.0°C setpoint must fail safety check")
 
-    def test_verification_monitor(self):
-        """Verify telemetry verification and continuous monitoring."""
-        monitor = VerificationMonitor()
+    def test_no_feasible_action_when_all_rejected(self):
+        """Verify that when all candidates violate constraints, no action is recommended."""
+        optimizer = ActionOptimizer()
         kubik_loader = KubikLoader()
         df = kubik_loader.load_feature_data()
         
-        snap = monitor.verify_telemetry(df.iloc[1000].to_dict())
-        self.assertIn("status", snap)
-        self.assertIn("metrics", snap)
+        # Snapshot in heatwave where zone temp is high (~36.8°C), exceeding 26.0°C upper limit
+        heatwave_state = df.iloc[5280].to_dict()
+        res = optimizer.select_best_action("KUBIK_HOLISDER", heatwave_state)
+        
+        self.assertIsNone(res["selected_action"], "Selected action must be None when all candidates are rejected")
+        self.assertEqual(res["recommendation_status"], "NO_FEASIBLE_ACTION")
+        self.assertIn("NO FEASIBLE ENERGY-SAVING ACTION", res["status_message"])
+        self.assertIsNotNone(res["lowest_energy_candidate"], "Lowest energy candidate should still be tracked for auditing")
+        self.assertFalse(res["lowest_energy_candidate"]["is_safe"], "Lowest energy candidate must be marked unsafe")
+
+    def test_lowest_energy_rejected_feasible_selected(self):
+        """Verify that a rejected lowest-energy candidate is never recommended over a feasible candidate."""
+        optimizer = ActionOptimizer()
+        kubik_loader = KubikLoader()
+        df = kubik_loader.load_feature_data()
+        state = df.iloc[1000].to_dict()
+        
+        res = optimizer.select_best_action("KUBIK_HOLISDER", state)
+        if res["selected_action"] is not None:
+            self.assertTrue(res["selected_action"]["is_safe"], "Recommended action must pass all mandatory safety checks")
+            self.assertEqual(res["selected_action"]["rejection_reason"], "Passed all mandatory constraints")
+
+    def test_missing_and_nonfinite_telemetry_handling(self):
+        """Verify that non-finite or missing sensor values are caught and rejected by evidence validation."""
+        optimizer = ActionOptimizer()
+        kubik_loader = KubikLoader()
+        df = kubik_loader.load_feature_data()
+        corrupted_state = df.iloc[1000].to_dict()
+        corrupted_state[settings.WEATHER_TAGS["outdoor_temp"]] = np.nan
+        
+        cand = optimizer.generate_kubik_candidates(corrupted_state)[0]
+        eval_res = optimizer.evaluate_kubik_what_if(cand, corrupted_state)
+        
+        self.assertFalse(eval_res["is_safe"], "Evaluation must fail when input telemetry contains NaN")
+        self.assertFalse(eval_res["has_valid_evidence"], "Evidence validity flag must be False")
+        self.assertIn("Invalid telemetry", eval_res["rejection_reason"])
+
+    def test_power_and_energy_unit_conversions(self):
+        """Verify electrical power and interval cost unit math."""
+        # 1000 W for 10 min at 0.24 EUR/kWh = 1 kW * (1/6 h) * 0.24 = 0.04 EUR
+        p_w = 1000.0
+        dur_h = 10.0 / 60.0
+        tariff = 0.24
+        cost = (p_w / 1000.0) * dur_h * tariff
+        self.assertAlmostEqual(cost, 0.04, places=4)
+        
+        # Zero baseline edge case: delta cost pct must be 0.0 without ZeroDivisionError
+        optimizer = ActionOptimizer()
+        zero_state = {f: 0.0 for f in optimizer.kubik_power_bundle["feature_names"]}
+        zero_state["tariff_eur_per_kwh"] = 0.15
+        res = optimizer.select_best_action("KUBIK_HOLISDER", zero_state)
+        self.assertIn("savings", res["all_evaluated_candidates"][0])
+        self.assertEqual(res["all_evaluated_candidates"][0]["savings"]["delta_cost_pct"], 0.0)
+
+    def test_feature_availability_csv_integrity(self):
+        """Verify that lbnl_feature_availability.csv parses cleanly without ParserError."""
+        csv_path = settings.REPORTS_DIR / "lbnl_feature_availability.csv"
+        self.assertTrue(csv_path.exists(), "Feature availability CSV must exist")
+        df = pd.read_csv(csv_path)
+        self.assertEqual(len(df), 16, f"Expected 16 rows, got {len(df)}")
+        self.assertIn("Feature_Domain", df.columns)
+        self.assertIn("Available_in_KUBIK", df.columns)
+        self.assertIn("Available_in_LBNL_Bldg59", df.columns)
+
+    def test_power_factor_standby_vs_load_diagnostics(self):
+        """Verify that PF near 0.13 in standby does not trigger a false utility penalty warning."""
+        monitor = VerificationMonitor()
+        
+        # Standby state (power 120 W, PF 0.13)
+        standby_record = {
+            settings.CHILLER_TAGS["chiller1_active_power_w"]: 120.0,
+            settings.CHILLER_TAGS["chiller1_pf"]: -0.13,
+            "HVAC_ENF1_CVM.VRS": 400.0,
+            "HVAC_ENF1_CVM.VST": 400.0,
+            "HVAC_ENF1_CVM.VTR": 400.0,
+            settings.FANCOIL_TAGS["fc1_zone_temp"]: 23.0,
+            settings.FANCOIL_TAGS["fc2_zone_temp"]: 23.0
+        }
+        snap_standby = monitor.verify_telemetry(standby_record)
+        # Should NOT be WARNING (marked INFO for idling inductive magnetizing current)
+        self.assertNotEqual(snap_standby["status"], "WARNING")
+        
+        # Active load state (power 1500 W, degraded PF 0.50)
+        load_record = standby_record.copy()
+        load_record[settings.CHILLER_TAGS["chiller1_active_power_w"]] = 1500.0
+        load_record[settings.CHILLER_TAGS["chiller1_pf"]] = -0.50
+        snap_load = monitor.verify_telemetry(load_record)
+        self.assertEqual(snap_load["status"], "WARNING", "Active load with PF 0.50 must raise WARNING")
 
 
 if __name__ == "__main__":

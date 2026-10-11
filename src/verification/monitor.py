@@ -37,13 +37,21 @@ class VerificationMonitor:
         p1 = float(current_record.get(settings.CHILLER_TAGS["chiller1_active_power_w"], 0.0))
         pf1 = abs(float(current_record.get(settings.CHILLER_TAGS["chiller1_pf"], 0.0)))
         
-        if p1 > 100.0 and pf1 < 0.65:
+        # In industrial metering (Circutor CVM 4-quadrant), low |PF| (e.g. ~0.13) under low active load (<500W)
+        # represents natural magnetizing inductive current in idling equipment, not an equipment failure or utility penalty.
+        if p1 > 500.0 and pf1 < 0.65:
             flags.append({
                 "severity": "WARNING",
                 "component": "Chiller 1 Electrical",
-                "message": f"Degraded Power Factor: |PF|={pf1:.2f} (< 0.65). Reactive penalties possible."
+                "message": f"Degraded Power Factor under load: |PF|={pf1:.2f} (< 0.65 at {p1:.0f} W). Utility reactive power penalty risk."
             })
             status = "WARNING"
+        elif 50.0 < p1 <= 500.0 and pf1 < 0.40:
+            flags.append({
+                "severity": "INFO",
+                "component": "Chiller 1 Electrical",
+                "message": f"Idling/Standby Power Factor: |PF|={pf1:.2f} at {p1:.0f} W. Inductive magnetizing current under partial load (verified non-penalty)."
+            })
             
         if p1 > self.bounds["chiller_power_max_w"]:
             flags.append({

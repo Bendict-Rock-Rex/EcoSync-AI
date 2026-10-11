@@ -147,9 +147,45 @@ class ActionOptimizer:
             else:
                 vec[f] = float(current_state.get(f, 0.0))
 
+        # Evidence validation: Ensure all features are finite
+        has_valid_evidence = True
+        evidence_violations = []
+        for f in power_features:
+            val = vec.get(f)
+            if val is None or not np.isfinite(val):
+                has_valid_evidence = False
+                evidence_violations.append(f"Invalid telemetry: {f} is non-finite")
+
+        if not has_valid_evidence:
+            return {
+                "candidate": candidate,
+                "predicted_power_kw": 0.0,
+                "predicted_power_w": 0.0,
+                "predicted_zone_temp_degc": 24.0,
+                "predicted_cost_interval": 0.0,
+                "predicted_co2_interval": 0.0,
+                "is_safe": False,
+                "has_valid_evidence": False,
+                "safety_violations": evidence_violations,
+                "comfort_penalty": 99.0,
+                "rejection_reason": "; ".join(evidence_violations)
+            }
+
         feat_df = pd.DataFrame([vec])[power_features]
-        pred_power_w = float(power_model.predict(feat_df)[0])
-        pred_power_w = max(0.0, pred_power_w)
+        raw_pred_power_w = float(power_model.predict(feat_df)[0])
+        
+        # Physical bounds: Running equipment cannot draw 0.0 W
+        if candidate["chiller1_order"] == 1 and candidate["chiller2_order"] == 1:
+            min_operating_power_w = 400.0
+        elif candidate["chiller1_order"] == 1 or candidate["chiller2_order"] == 1:
+            min_operating_power_w = 180.0
+        else:
+            min_operating_power_w = 0.0
+
+        if raw_pred_power_w < min_operating_power_w and min_operating_power_w > 0:
+            pred_power_w = min_operating_power_w
+        else:
+            pred_power_w = max(0.0, raw_pred_power_w)
 
         # Feature vector for zone thermal
         t_vec = {}
@@ -161,6 +197,12 @@ class ActionOptimizer:
             else:
                 t_vec[f] = float(current_state.get(f, 24.0))
 
+        # Check thermal features evidence
+        for f, val in t_vec.items():
+            if val is None or not np.isfinite(val):
+                has_valid_evidence = False
+                evidence_violations.append(f"Invalid thermal telemetry: {f}")
+
         t_feat_df = pd.DataFrame([t_vec])[thermal_features]
         pred_zone_temp = float(thermal_model.predict(t_feat_df)[0])
 
@@ -171,6 +213,10 @@ class ActionOptimizer:
         # Evidence-Gated Safety Checks
         safety_violations = []
         is_safe = True
+
+        if not has_valid_evidence:
+            safety_violations.extend(evidence_violations)
+            is_safe = False
 
         if pred_zone_temp > settings.SAFETY_BOUNDS["zone_temp_max"]:
             safety_violations.append(f"Comfort upper breach: Zone predicted at {pred_zone_temp:.1f}°C (> {settings.SAFETY_BOUNDS['zone_temp_max']}°C)")
@@ -198,9 +244,10 @@ class ActionOptimizer:
             "predicted_cost_interval": round(cost_10min, 4),
             "predicted_co2_interval": round(co2_10min, 4),
             "is_safe": is_safe,
+            "has_valid_evidence": has_valid_evidence,
             "safety_violations": safety_violations,
             "comfort_penalty": comfort_penalty,
-            "rejection_reason": "; ".join(safety_violations) if not is_safe else "Passed all safety invariants"
+            "rejection_reason": "; ".join(safety_violations) if not is_safe else "Passed all mandatory constraints"
         }
 
     # =========================================================
@@ -261,6 +308,31 @@ class ActionOptimizer:
         occ_features = self.lbnl_bundle["occ_features"]
 
         vec = {f: float(current_state.get(f, 0.0)) for f in occ_features}
+
+        # Evidence validation: Ensure features are finite
+        has_valid_evidence = True
+        evidence_violations = []
+        for f in occ_features:
+            val = vec.get(f)
+            if val is None or not np.isfinite(val):
+                has_valid_evidence = False
+                evidence_violations.append(f"Invalid telemetry: {f} is non-finite")
+
+        if not has_valid_evidence:
+            return {
+                "candidate": candidate,
+                "predicted_power_kw": 0.0,
+                "predicted_power_w": 0.0,
+                "predicted_zone_temp_degc": 20.0,
+                "predicted_cost_interval": 0.0,
+                "predicted_co2_interval": 0.0,
+                "is_safe": False,
+                "has_valid_evidence": False,
+                "safety_violations": evidence_violations,
+                "comfort_penalty": 99.0,
+                "rejection_reason": "; ".join(evidence_violations)
+            }
+
         feat_df = pd.DataFrame([vec])[occ_features]
         base_pred_kw = float(model_with_occ.predict(feat_df)[0])
         
@@ -275,6 +347,11 @@ class ActionOptimizer:
         # Safety & Comfort Constraints
         safety_violations = []
         is_safe = True
+
+        if not has_valid_evidence:
+            safety_violations.extend(evidence_violations)
+            is_safe = False
+
         occ_total = float(current_state.get("occ_total", 0.0))
         tout = float(current_state.get("air_temp_set_1", 18.0))
 
@@ -303,9 +380,10 @@ class ActionOptimizer:
             "predicted_cost_interval": round(cost_15min, 4),
             "predicted_co2_interval": round(co2_15min, 4),
             "is_safe": is_safe,
+            "has_valid_evidence": has_valid_evidence,
             "safety_violations": safety_violations,
             "comfort_penalty": comfort_penalty,
-            "rejection_reason": "; ".join(safety_violations) if not is_safe else "Passed all safety invariants"
+            "rejection_reason": "; ".join(safety_violations) if not is_safe else "Passed all mandatory constraints"
         }
 
     # =========================================================
@@ -335,13 +413,8 @@ class ActionOptimizer:
         baseline_cost = baseline_eval["predicted_cost_interval"]
         baseline_co2 = baseline_eval["predicted_co2_interval"]
 
-        safe_evals = [e for e in evaluations if e["is_safe"]]
-        eligible_pool = safe_evals if safe_evals else evaluations
-
-        best_score = 1e9
-        selected = None
-
-        for item in eligible_pool:
+        # Calculate scores and savings for ALL candidates
+        for item in evaluations:
             cost = item["predicted_cost_interval"]
             comfort = item["comfort_penalty"]
             carbon = item["predicted_co2_interval"]
@@ -360,17 +433,41 @@ class ActionOptimizer:
                 "delta_co2_pct": round(delta_co2_pct, 2)
             }
 
-            if score < best_score:
-                best_score = score
-                selected = item
+        # Lowest energy candidate regardless of feasibility (useful evidence)
+        lowest_energy_cand = min(evaluations, key=lambda x: x["predicted_power_kw"])
+
+        # Filter strictly for feasible candidates (safe AND valid evidence)
+        safe_evals = [e for e in evaluations if e["is_safe"] and e.get("has_valid_evidence", True)]
+
+        if len(safe_evals) > 0:
+            # Pick lowest multi-objective score among strictly safe/feasible candidates
+            best_feasible = min(safe_evals, key=lambda x: x["selection_score"])
+            selected = best_feasible
+            recommendation_status = "FEASIBLE_ACTION_RECOMMENDED"
+            status_message = f"Feasible recommendation selected: {selected['candidate']['name']}"
+        else:
+            best_feasible = None
+            selected = None
+            recommendation_status = "NO_FEASIBLE_ACTION"
+            status_message = (
+                "NO FEASIBLE ENERGY-SAVING ACTION. All evaluated candidates violate one or more "
+                "mandatory operating constraints. Maintain the appropriate safe operating state and request further assessment."
+            )
 
         return {
             "dataset_id": dataset_id,
             "power_unit": power_unit,
             "selected_action": selected,
+            "best_feasible_candidate": best_feasible,
+            "lowest_energy_candidate": lowest_energy_cand,
+            "recommendation_status": recommendation_status,
+            "status_message": status_message,
             "baseline": baseline_eval,
             "all_evaluated_candidates": evaluations,
-            "is_simulated": True  # Explicitly marks that all candidates are simulated interventions
+            "is_simulated": True,
+            "num_candidates_evaluated": len(evaluations),
+            "num_candidates_passed": len(safe_evals),
+            "num_candidates_rejected": len(evaluations) - len(safe_evals)
         }
 
 

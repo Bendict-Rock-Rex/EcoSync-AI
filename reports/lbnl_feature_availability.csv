@@ -1,17 +1,17 @@
 Feature_Domain,Specific_Measurement,Available_in_KUBIK,KUBIK_Variable,Available_in_LBNL_Bldg59,LBNL_Variable,Cross_Building_Mapping_Status,Notes
-Weather,Outdoor Dry Bulb Temperature,Yes,METEO_GardenWS_AT.PV (°C),Yes,site_weather.csv: air_temp_set_1 (°C),Directly Comparable,Both measure outdoor dry bulb in °C at site
-Weather,Solar Radiation,Yes,METEO_RoofSR_Global.PV (W/m²),Yes,site_weather.csv: solar_radiation_set_1 (W/m²),Directly Comparable,Both measure global horizontal radiation in W/m²
-Weather,Outdoor Relative Humidity,No,N/A,Yes,site_weather.csv: relative_humidity_set_1 (%),LBNL Only,KUBIK has no direct RH tag in cooling workbook
-Occupancy,Camera-Based Occupant Headcount,No,N/A,Yes,occ.csv: occ_third_south + occ_fourth_south,LBNL Only,KUBIK experimental facility has no camera occupancy
-Occupancy,Wi-Fi Connection Counts,No,N/A,Yes,wifi.csv: wifi_third_south + wifi_fourth_south,LBNL Only,Proxy metric available in LBNL
-HVAC Energy,Total HVAC Electric Power,Yes,HVAC_ENF1_CVM.W + HVAC_ENF2_CVM.W (W),Yes,ele.csv: (hvac_N + hvac_S) (kW),Unit Harmonized (W vs kW),KUBIK measures chillers in W; LBNL measures RTU fans/compressors in kW
-Whole-Building Energy,Whole-Building Total Power,No,N/A,Yes,ele.csv: mels + lig + hvac (kW),LBNL Only,KUBIK records only chiller/fan-coil cooling circuit
-Electrical Quality,Three-Phase Power Factor (PF),Yes,HVAC_ENF1_CVM.PF_III (Circutor Analyzer),No,Absent,KUBIK Only,LBNL has no PF / phase angle telemetry
-Electrical Quality,Three-Phase Voltages (V_RS/V_ST/V_TR),Yes,HVAC_ENF1_CVM.V_III / VRS / VST / VTR (V),No,Absent,KUBIK Only,LBNL meters report only kW, no voltage channels
-Electrical Quality,Three-Phase Currents (IR/IS/IT),Yes,HVAC_ENF1_CVM.IR / IS / IT (A),No,Absent,KUBIK Only,LBNL meters report only kW, no current channels
-Electrical Quality,Reactive Power & Harmonics,Yes,HVAC_ENF1_CVM.VAr / kVArh,No,Absent,KUBIK Only,LBNL has no reactive power or harmonic records
-Thermal Output,Chilled Water Thermal Power,Yes,HVAC_WP301.W + HVAC_WP401.W (W),Yes (Subset),ashp_meter.csv (mbtuph) & ashp_cw.csv (Temp/Flow),Partially Comparable,KUBIK has continuous thermal W; LBNL ASHP meter only covers Aug-Dec 2020
-Zone Environment,Indoor Air Temperatures,Yes,F0N2_FCM1.PV (°C),Yes,zone_temp_exterior.csv (°F),Unit Conversion Required (°F to °C),KUBIK in °C, LBNL exterior zones in °F
-HVAC Actuation,Thermostat / Chiller Setpoint Control,Yes,HVAC_Enfriadora1.SP (°C),Yes,zone_temp_sp_c.csv / rtu_sa_t_sp.csv (°F),Separate Architecture,KUBIK chiller water setpoint; LBNL rooftop VAV supply air setpoint
-HVAC Staging,Chiller On/Off Order,Yes,HVAC_ENF1_m.OUT (Binary 0/1),No (Continuous Fans),rtu_fan_spd.csv (% VFD speed),Incompatible Staging,KUBIK has dual staging discrete orders; LBNL modulates VFD fans
-Physical Fault Labels,Labelled Operating Faults,No,N/A,No,Absent,Neither Dataset,Neither dataset provides ground-truth injected fault labels
+Weather,Outdoor Dry Bulb Temperature,Yes,"METEO_GardenWS_AT.PV (°C)",Yes,"site_weather.csv: air_temp_set_1 (°C)",Directly Comparable,"Both measure outdoor dry bulb in °C at site"
+Weather,Solar Radiation,Yes,"METEO_RoofSR_Global.PV (W/m²)",Yes,"site_weather.csv: solar_radiation_set_1 (W/m²)",Directly Comparable,"Both measure global horizontal radiation in W/m²"
+Weather,Outdoor Relative Humidity,No,N/A,Yes,"site_weather.csv: relative_humidity_set_1 (%)",LBNL Only,"KUBIK has no direct RH tag in cooling workbook"
+Occupancy,Camera-Based Occupant Headcount,No,N/A,Yes,"occ.csv: occ_third_south + occ_fourth_south",LBNL Only,"KUBIK experimental facility has no camera occupancy"
+Occupancy,Wi-Fi Connection Counts,No,N/A,Yes,"wifi.csv: wifi_third_south + wifi_fourth_south",LBNL Only,"Proxy metric available in LBNL"
+HVAC Energy,Total HVAC Electric Power,Yes,"HVAC_ENF1_CVM.W + HVAC_ENF2_CVM.W (W)",Yes,"ele.csv: (hvac_N + hvac_S) (kW)",Unit Harmonized (W vs kW),"KUBIK measures chillers in W; LBNL measures RTU fans/compressors in kW"
+Whole-Building Energy,Whole-Building Total Power,No,N/A,Yes,"ele.csv: mels + lig + hvac (kW)",LBNL Only,"KUBIK records only chiller/fan-coil cooling circuit"
+Electrical Quality,Three-Phase Power Factor (PF),Yes,"HVAC_ENF1_CVM.PF_III (Circutor Analyzer)",No,Absent,KUBIK Only,"LBNL has no PF / phase angle telemetry"
+Electrical Quality,Three-Phase Voltages (V_RS/V_ST/V_TR),Yes,"HVAC_ENF1_CVM.V_III / VRS / VST / VTR (V)",No,Absent,KUBIK Only,"LBNL meters report only kW, no voltage channels"
+Electrical Quality,Three-Phase Currents (IR/IS/IT),Yes,"HVAC_ENF1_CVM.IR / IS / IT (A)",No,Absent,KUBIK Only,"LBNL meters report only kW, no current channels"
+Electrical Quality,Reactive Power & Harmonics,Yes,"HVAC_ENF1_CVM.VAr / kVArh",No,Absent,KUBIK Only,"LBNL has no reactive power or harmonic records"
+Thermal Output,Chilled Water Thermal Power,Yes,"HVAC_WP301.W + HVAC_WP401.W (W)",Yes (Subset),"ashp_meter.csv (mbtuph) & ashp_cw.csv (Temp/Flow)",Partially Comparable,"KUBIK has continuous thermal W; LBNL ASHP meter only covers Aug-Dec 2020"
+Zone Environment,Indoor Air Temperatures,Yes,"F0N2_FCM1.PV (°C)",Yes,"zone_temp_exterior.csv (°F)",Unit Conversion Required (°F to °C),"KUBIK in °C, LBNL exterior zones in °F"
+HVAC Actuation,Thermostat / Chiller Setpoint Control,Yes,"HVAC_Enfriadora1.SP (°C)",Yes,"zone_temp_sp_c.csv / rtu_sa_t_sp.csv (°F)",Separate Architecture,"KUBIK chiller water setpoint; LBNL rooftop VAV supply air setpoint"
+HVAC Staging,Chiller On/Off Order,Yes,"HVAC_ENF1_m.OUT (Binary 0/1)",No (Continuous Fans),"rtu_fan_spd.csv (% VFD speed)",Incompatible Staging,"KUBIK has dual staging discrete orders; LBNL modulates VFD fans"
+Physical Fault Labels,Labelled Operating Faults,No,N/A,No,Absent,Neither Dataset,"Neither dataset provides ground-truth injected fault labels"
