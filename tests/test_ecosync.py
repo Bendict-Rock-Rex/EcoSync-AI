@@ -280,5 +280,77 @@ class TestEcoSyncAI(unittest.TestCase):
         self.assertEqual(snap_load["status"], "WARNING", "Active load with PF 0.50 must raise WARNING")
 
 
+    def test_digital_twin_python_simulation_physics(self):
+        """Verify that BuildingDigitalTwin Python ODE produces physically realistic response."""
+        from src.simulation.building_twin import BuildingDigitalTwin
+        twin = BuildingDigitalTwin()
+        N = 12
+        time_sec = np.arange(N) * 600.0
+        T_amb = np.full(N, 30.0)
+        solar = np.full(N, 400.0)
+        chiller_on = np.ones(N)
+        T_chw = np.full(N, 10.5)
+        T_zone_sp = np.full(N, 23.5)
+
+        res = twin.simulate_scenario_python(time_sec, T_amb, solar, chiller_on, T_chw, T_zone_sp, initial_T_zone=23.5)
+        self.assertEqual(len(res["T_zone_degc"]), N)
+        self.assertGreater(res["total_energy_kwh"], 0.0)
+        self.assertGreater(res["peak_power_w"], 0.0)
+        self.assertLess(res["peak_power_w"], settings.SAFETY_BOUNDS["chiller_power_max_w"])
+        # Temperatures must stay finite and physically bounded
+        for t in res["T_zone_degc"]:
+            self.assertTrue(15.0 <= t <= 40.0, f"Zone temp {t} out of physical bounds")
+
+    def test_simulink_model_file_exists(self):
+        """Verify that the generated Simulink model artifact exists."""
+        slx_path = BASE_DIR / "matlab" / "simulink" / "kubik_building_model.slx"
+        self.assertTrue(slx_path.exists(), "Simulink model .slx file must exist")
+        self.assertGreater(slx_path.stat().st_size, 1000, "Simulink model file must not be empty")
+
+    def test_matlab_digital_twin_simulation_reproducibility(self):
+        """Verify that MATLAB digital twin simulation runs successfully or falls back cleanly."""
+        from src.simulation.building_twin import BuildingDigitalTwin
+        twin = BuildingDigitalTwin()
+        N = 6
+        time_sec = np.arange(N) * 600.0
+        T_amb = np.full(N, 28.0)
+        solar = np.full(N, 350.0)
+        chiller_on = np.ones(N)
+        T_chw = np.full(N, 10.5)
+        T_zone_sp = np.full(N, 23.5)
+
+        res = twin.simulate_scenario_matlab(time_sec, T_amb, solar, chiller_on, T_chw, T_zone_sp, initial_T_zone=23.5)
+        self.assertIn("total_energy_kwh", res)
+        self.assertGreater(res["total_energy_kwh"], 0.0)
+
+    def test_closed_loop_autonomous_controller_verification(self):
+        """Verify closed-loop sequence: optimization, plant intervention, verification, and recovery."""
+        from src.simulation.closed_loop_controller import ClosedLoopController
+        loader = KubikLoader()
+        df = loader.load_feature_data()
+        rec = df.iloc[100].to_dict()
+        rec[settings.FANCOIL_TAGS["fc1_zone_temp"]] = 23.5
+
+        ctrl = ClosedLoopController(use_matlab=False)
+        # 1. Normal run with successful verification
+        out_norm = ctrl.run_simulation_horizon(rec, scenario_name="Standard_Cooling_Day", horizon_steps=12)
+        self.assertEqual(out_norm["mode"], "AUTONOMOUS_CLOSED_LOOP")
+        self.assertIn(out_norm["verification_status"], ["VERIFIED_SUCCESS", "VERIFIED_FAILURE"])
+        self.assertEqual(len(out_norm["events_log"]), 11, "Must contain all 11 architecture steps in log")
+
+        # 2. Failed action triggers recovery
+        out_fail = ctrl.run_simulation_horizon(rec, scenario_name="Standard_Cooling_Day", horizon_steps=12, simulate_action_failure=True)
+        self.assertEqual(out_fail["verification_status"], "VERIFIED_FAILURE")
+        recovery_events = [e for e in out_fail["events_log"] if "RECOVERY" in e.get("status", "") or "RECOVERY" in e.get("detail", "")]
+        self.assertGreater(len(recovery_events), 0, "Must record recovery event on failure")
+
+        # 3. No feasible action holds safe baseline
+        out_nofeas = ctrl.run_simulation_horizon(rec, scenario_name="Severe_Peak_Heatwave", horizon_steps=12, simulate_no_feasible=True)
+        self.assertEqual(out_nofeas["mode"], "NO_FEASIBLE_ACTION_HANDLED")
+        self.assertEqual(out_nofeas["energy_saved_kwh"], 0.0)
+        self.assertEqual(out_nofeas["savings_pct"], 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()
+

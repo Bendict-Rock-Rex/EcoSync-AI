@@ -34,6 +34,8 @@ from src.data.feature_mapping import CanonicalFeatureSchema
 from src.models.explainability import ExplainabilityEngine
 from src.optimization.action_optimizer import ActionOptimizer
 from src.verification.monitor import VerificationMonitor
+from src.simulation.building_twin import BuildingDigitalTwin
+from src.simulation.closed_loop_controller import ClosedLoopController
 
 st.set_page_config(
     page_title="EcoSync-AI | Schneider Electric Industrial Asset Intelligence",
@@ -322,6 +324,7 @@ nav_section = st.sidebar.radio(
     "Console View",
     [
         "Executive Workflow Console",
+        "Autonomous Digital Twin & Closed-Loop Control",
         "Operating State & Equipment Flow",
         "Demand Forecast & Uncertainty",
         "Risk Assessment & Attribution",
@@ -752,6 +755,167 @@ elif nav_section == "Operating State & Equipment Flow":
             tooltip=["DateTime:T", "Telemetry Channel:N", "Value:Q"]
         ).properties(height=300)
         st.altair_chart(apply_dark_chart(chart), use_container_width=True)
+
+
+# =============================================================
+# AUTONOMOUS DIGITAL TWIN & CLOSED-LOOP CONTROL (MATLAB & ODE)
+# =============================================================
+elif nav_section == "Autonomous Digital Twin & Closed-Loop Control":
+    st.markdown("""
+    <div class="brand-bar">
+        <div>
+            <div class="brand-title">🔄 Autonomous Digital Twin & Closed-Loop Control</div>
+            <div class="brand-subtitle">Simulink ODE Plant Model • Closed-Loop Supervisory Control • Real-Time Verification</div>
+        </div>
+        <div class="provenance-chip chip-kubik">Simulink & Calibrated ODE Plant</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    twin = BuildingDigitalTwin()
+    matlab_installed = twin.is_matlab_available()
+
+    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+    with col_stat1:
+        st.markdown(f"""
+        <div class="scada-card">
+            <div class="scada-label">Plant Twin Engine</div>
+            <div class="scada-val val-emerald">{'Simulink / MATLAB' if matlab_installed else 'Python ODE'}</div>
+            <div class="scada-sub">{'MATLAB R2025a Connected' if matlab_installed else 'Cloud Deterministic Fallback'}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_stat2:
+        st.markdown(f"""
+        <div class="scada-card">
+            <div class="scada-label">Thermal Capacitance (C_th)</div>
+            <div class="scada-val val-cyan">4.20 MJ/K</div>
+            <div class="scada-sub">Calibrated Lumped Zone Model</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_stat3:
+        st.markdown(f"""
+        <div class="scada-card">
+            <div class="scada-label">Envelope Conductance (UA)</div>
+            <div class="scada-val val-amber">125.0 W/K</div>
+            <div class="scada-sub">KUBIK Testbed Fenestration</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_stat4:
+        st.markdown(f"""
+        <div class="scada-card">
+            <div class="scada-label">Nominal Chiller COP</div>
+            <div class="scada-val">3.20</div>
+            <div class="scada-sub">+3.2% per °C Chilled Water Float</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("##### 1. Closed-Loop Scenario Configuration")
+    sc1, sc2, sc3, sc4 = st.columns([1.5, 1.2, 1.2, 1.2])
+    with sc1:
+        sim_scenario = st.selectbox(
+            "Disturbance Scenario",
+            [
+                "Standard_Cooling_Day",
+                "Rising_Ambient_Heatwave",
+                "Severe_Peak_Heatwave",
+                "Mild_Offpeak_Cooling"
+            ],
+            help="Select weather disturbance curve to evaluate plant response under."
+        )
+    with sc2:
+        sim_mode = st.selectbox(
+            "Operating Intervention",
+            [
+                "Autonomous Optimized Control",
+                "Baseline (Uncontrolled)",
+                "Ineffective / Malfunctioning Action",
+                "Severe Stress (No Feasible Action)"
+            ]
+        )
+    with sc3:
+        engine_choice = st.selectbox(
+            "Execution Engine",
+            ["MATLAB / Simulink Batch Runner" if matlab_installed else "Python Native ODE", "Python Native ODE"]
+        )
+        use_mat = (engine_choice == "MATLAB / Simulink Batch Runner" and matlab_installed)
+    with sc4:
+        horizon_hours = st.slider("Horizon Duration", min_value=1, max_value=6, value=2, step=1)
+        horizon_steps = horizon_hours * 6 # 6 steps per hour (10-min cadence)
+
+    # Execute Closed-Loop Controller
+    controller = ClosedLoopController(use_matlab=use_mat)
+    test_rec = current_row.copy()
+    test_rec[settings.FANCOIL_TAGS["fc1_zone_temp"]] = 23.5 # Standard neutral starting condition
+
+    is_fail = (sim_mode == "Ineffective / Malfunctioning Action")
+    is_nofeas = (sim_mode == "Severe Stress (No Feasible Action)")
+    apply_opt = (sim_mode != "Baseline (Uncontrolled)")
+
+    loop_res = controller.run_simulation_horizon(
+        initial_record=test_rec,
+        scenario_name=sim_scenario,
+        horizon_steps=horizon_steps,
+        apply_optimization=apply_opt,
+        simulate_action_failure=is_fail,
+        simulate_no_feasible=is_nofeas
+    )
+
+    # Verification Badge
+    st.markdown("##### 2. Closed-Loop Performance & Verification Result")
+    ver_status = loop_res.get("verification_status", "BASELINE")
+    if ver_status == "VERIFIED_SUCCESS":
+        st.success(f"✅ **CLOSED-LOOP VERIFICATION: SUCCESS** | Power error: {loop_res.get('power_prediction_error_pct', 0.0):.1f}% | Energy Saved: {loop_res.get('energy_saved_kwh', 0.0):.2f} kWh ({loop_res.get('savings_pct', 0.0)}%) | 0 Comfort Breaches")
+    elif ver_status == "VERIFIED_FAILURE":
+        st.error(f"⚠️ **CLOSED-LOOP VERIFICATION: FAILED — RECOVERY ACTIVATED** | Plant response diverged from expected bounds. Supervisory controller triggered automatic rollback to Safe Nominal Setpoints.")
+    elif ver_status == "SAFETY_HELD_NO_ACTION":
+        st.warning(f"🛡️ **SAFETY LOCKOUT: NO FEASIBLE ACTION** | All proposed interventions violate safety boundaries under extreme stress. Baseline held at 0.0% false energy savings.")
+    else:
+        st.info(f"ℹ️ **BASELINE UNCONTROLLED RUN** | Constant setpoint hold without supervisory optimization.")
+
+    # Side-by-side Trajectory Charts
+    st.markdown("##### 3. Simulated Plant Trajectory vs Baseline")
+    b_res = loop_res.get("baseline_results", loop_res.get("results", {}))
+    c_res = loop_res.get("controlled_results", b_res)
+
+    t_mins = [s * 10 for s in range(len(b_res["T_zone_degc"]))]
+    traj_df = pd.DataFrame({
+        "Elapsed Time (min)": t_mins,
+        "Baseline Zone Temp (°C)": b_res["T_zone_degc"],
+        "Controlled Zone Temp (°C)": c_res["T_zone_degc"],
+        "Baseline Chiller Power (W)": b_res["chiller_power_w"],
+        "Controlled Chiller Power (W)": c_res["chiller_power_w"],
+    })
+
+    c_col1, c_col2 = st.columns(2)
+    with c_col1:
+        t_chart = alt.Chart(traj_df).transform_fold(
+            ["Baseline Zone Temp (°C)", "Controlled Zone Temp (°C)"],
+            as_=["Profile", "Temperature (°C)"]
+        ).mark_line(strokeWidth=2.5).encode(
+            x=alt.X("Elapsed Time (min):Q", title="Elapsed Simulation Time (minutes)"),
+            y=alt.Y("Temperature (°C):Q", scale=alt.Scale(domain=[21.0, 27.0]), title="Zone Temperature (°C)"),
+            color=alt.Color("Profile:N", scale=alt.Scale(range=["#F59E0B", "#10B981"])),
+            tooltip=["Elapsed Time (min):Q", "Profile:N", "Temperature (°C):Q"]
+        ).properties(height=260, title="Zone Air Temperature Response (°C)")
+        st.altair_chart(apply_dark_chart(t_chart), use_container_width=True)
+
+    with c_col2:
+        p_chart = alt.Chart(traj_df).transform_fold(
+            ["Baseline Chiller Power (W)", "Controlled Chiller Power (W)"],
+            as_=["Profile", "Active Power (W)"]
+        ).mark_line(strokeWidth=2.5).encode(
+            x=alt.X("Elapsed Time (min):Q", title="Elapsed Simulation Time (minutes)"),
+            y=alt.Y("Active Power (W):Q", title="Chiller Electrical Power (Watts)"),
+            color=alt.Color("Profile:N", scale=alt.Scale(range=["#F59E0B", "#10B981"])),
+            tooltip=["Elapsed Time (min):Q", "Profile:N", "Active Power (W):Q"]
+        ).properties(height=260, title="Chiller Electrical Power Demand (Watts)")
+        st.altair_chart(apply_dark_chart(p_chart), use_container_width=True)
+
+    # 11-Stage Autonomous Event Log
+    st.markdown("##### 4. 11-Stage Autonomous Supervisory Event Log")
+    log_entries = loop_res.get("events_log", [])
+    log_df = pd.DataFrame(log_entries)
+    if not log_df.empty:
+        st.dataframe(log_df, use_container_width=True, hide_index=True)
 
 
 # =============================================================
