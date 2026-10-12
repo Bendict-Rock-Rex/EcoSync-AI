@@ -342,15 +342,62 @@ class TestEcoSyncAI(unittest.TestCase):
         out_fail = ctrl.run_simulation_horizon(rec, scenario_name="Standard_Cooling_Day", horizon_steps=12, simulate_action_failure=True)
         self.assertEqual(out_fail["verification_status"], "VERIFIED_FAILURE")
         recovery_events = [e for e in out_fail["events_log"] if "RECOVERY" in e.get("status", "") or "RECOVERY" in e.get("detail", "")]
-        self.assertGreater(len(recovery_events), 0, "Must record recovery event on failure")
+    def test_illegal_6c_candidate_rejection_at_safety_gate(self):
+        """Verify that an illegal 6.0°C chilled water setpoint is rejected by the safety gate and never selected."""
+        optimizer = ActionOptimizer()
+        loader = KubikLoader()
+        df = loader.load_feature_data()
+        rec = df.iloc[100].to_dict()
 
-        # 3. No feasible action holds safe baseline
-        out_nofeas = ctrl.run_simulation_horizon(rec, scenario_name="Severe_Peak_Heatwave", horizon_steps=12, simulate_no_feasible=True)
-        self.assertEqual(out_nofeas["mode"], "NO_FEASIBLE_ACTION_HANDLED")
-        self.assertEqual(out_nofeas["energy_saved_kwh"], 0.0)
-        self.assertEqual(out_nofeas["savings_pct"], 0.0)
+        cand_6c = {
+            "action_id": "TEST_ILLEGAL_6C",
+            "name": "Illegal Overcooling 6C",
+            "description": "Setpoint below safety boundary [7.0, 14.0]",
+            "intervention_type": "Chilled Water Reset",
+            "chiller1_order": 1, "chiller2_order": 0,
+            "chiller1_sp": 6.0, "chiller2_sp": 6.0,
+            "fc1_sp": 23.0, "fc2_sp": 23.0
+        }
+        eval_res = optimizer.evaluate_kubik_what_if(cand_6c, rec)
+        self.assertFalse(eval_res["is_safe"], "6.0°C candidate must be flagged unsafe")
+        self.assertIn("Chilled water limit violated", eval_res["rejection_reason"])
+
+    def test_actuator_fault_injection_and_recovery(self):
+        """Verify that a supervisor-bypassing hardware actuator fault is caught by verification and triggers recovery."""
+        from src.simulation.closed_loop_controller import ClosedLoopController
+        loader = KubikLoader()
+        df = loader.load_feature_data()
+        rec = df.iloc[100].to_dict()
+        rec[settings.FANCOIL_TAGS["fc1_zone_temp"]] = 23.5
+
+        ctrl = ClosedLoopController(use_matlab=False)
+        out_fault = ctrl.run_simulation_horizon(rec, scenario_name="Standard_Cooling_Day", horizon_steps=12, simulate_action_failure=True)
+        self.assertEqual(out_fault["verification_status"], "VERIFIED_FAILURE")
+        # Ensure fault injection was logged explicitly
+        fault_logs = [e for e in out_fault["events_log"] if "FAULT" in e.get("phase", "") or "FAULT" in e.get("status", "")]
+        self.assertGreater(len(fault_logs), 0, "Must record explicit fault injection event in event log")
+        # Ensure recovery was applied
+        recovery_logs = [e for e in out_fault["events_log"] if "RECOVERY" in e.get("status", "")]
+        self.assertGreater(len(recovery_logs), 0, "Must record recovery event in event log")
+
+    def test_severe_heatwave_unmet_comfort_reporting(self):
+        """Verify that severe heatwave (42°C ambient, 28.5°C zone) reports unmet comfort constraint honestly."""
+        from src.simulation.closed_loop_controller import ClosedLoopController
+        loader = KubikLoader()
+        df = loader.load_feature_data()
+        rec = df.iloc[100].to_dict()
+
+        ctrl = ClosedLoopController(use_matlab=False)
+        out_heat = ctrl.run_simulation_horizon(rec, scenario_name="Severe_Peak_Heatwave", horizon_steps=12, simulate_no_feasible=True)
+        self.assertEqual(out_heat["mode"], "NO_FEASIBLE_ACTION_HANDLED")
+        self.assertEqual(out_heat["energy_saved_kwh"], 0.0, "Zero false energy savings")
+        self.assertEqual(out_heat["savings_pct"], 0.0)
+        # Must report unmet comfort constraint honestly, not safe comfort compliance
+        self.assertEqual(out_heat["verification_status"], "SAFETY_HELD_UNMET_COMFORT")
+        self.assertGreater(out_heat["baseline_results"]["comfort_violation_count"], 0)
 
 
 if __name__ == "__main__":
     unittest.main()
+
 

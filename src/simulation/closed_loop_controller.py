@@ -125,24 +125,32 @@ class ClosedLoopController:
         ]
 
         if selected_cand is None or rec_status == "NO_FEASIBLE_ACTION":
-            # Safety gate held: Maintain safe baseline, zero false savings
+            # Safety gate held: Maintain baseline operation, report unmet constraints honestly
+            baseline_violations = baseline_res.get("comfort_violation_count", 0)
+            if baseline_violations > 0:
+                feas_detail = f"All optimization candidates rejected. Zone has {baseline_violations} comfort violations (>26.0°C) under severe ambient load. Baseline maintained under distress; emergency capacity limit reached."
+                ver_status = "SAFETY_HELD_UNMET_COMFORT"
+            else:
+                feas_detail = "All candidate actions rejected on safety bounds. Holding safe baseline operation."
+                ver_status = "SAFETY_HELD_NO_ACTION"
+
             events_log.append({
                 "step": 9,
                 "phase": "Apply Action",
                 "status": "BLOCKED",
-                "detail": "No candidate action passed safety bounds. Holding safe baseline operation."
+                "detail": feas_detail
             })
             events_log.append({
                 "step": 10,
                 "phase": "Verify",
                 "status": "ABORTED",
-                "detail": "Intervention bypassed due to zero feasible candidates."
+                "detail": "Intervention bypassed due to zero feasible candidates. Comfort constraint unmet under current equipment capacity."
             })
             events_log.append({
                 "step": 11,
                 "phase": "Learn & Update",
                 "status": "COMPLETED",
-                "detail": "Recorded infeasibility event in supervisory log."
+                "detail": "Recorded infeasibility and capacity saturation event in supervisory diagnostic log."
             })
             return {
                 "scenario_name": scenario_name,
@@ -153,7 +161,7 @@ class ClosedLoopController:
                 "baseline_results": baseline_res,
                 "energy_saved_kwh": 0.0,
                 "savings_pct": 0.0,
-                "verification_status": "SAFETY_HELD_NO_ACTION",
+                "verification_status": ver_status,
                 "power_prediction_error_pct": 0.0,
                 "events_log": events_log
             }
@@ -165,15 +173,23 @@ class ClosedLoopController:
         ctrl_chiller_on = np.full(horizon_steps, cand_data["chiller1_order"])
 
         if simulate_action_failure:
-            # Simulate an actuator malfunction / ineffective response (e.g. damper stuck, supply setpoint ignored)
-            ctrl_chw_sp = np.full(horizon_steps, 6.0) # Illegal overcooling command causing freeze breach
-
-        events_log.append({
-            "step": 9,
-            "phase": "Apply Action",
-            "status": "APPLIED_SIMULATED",
-            "detail": f"Dispatched setpoints: Chiller SP={ctrl_chw_sp[0]:.1f}°C, Thermostat SP={ctrl_zone_sp[0]:.1f}°C"
-        })
+            # Dedicated Hardware Fault-Injection Scenario:
+            # Simulates an actuator positioner failure or valve seizure downstream of the supervisor
+            # that forces illegal chilled water delivery (e.g. 6.0°C) bypassing setpoint limits.
+            ctrl_chw_sp = np.full(horizon_steps, 6.0)
+            events_log.append({
+                "step": 9,
+                "phase": "Apply Action (FAULT INJECTION)",
+                "status": "ACTUATOR_FAULT_INJECTED",
+                "detail": "Simulated hardware actuator seizure: valve bypassed supervisor setpoint and forced 6.0°C chilled water delivery."
+            })
+        else:
+            events_log.append({
+                "step": 9,
+                "phase": "Apply Action",
+                "status": "APPLIED_SIMULATED",
+                "detail": f"Dispatched setpoints: Chiller SP={ctrl_chw_sp[0]:.1f}°C, Thermostat SP={ctrl_zone_sp[0]:.1f}°C"
+            })
 
         # 4. Advance Simulation with Applied Setpoints
         controlled_res = sim_fn(time_sec, T_amb, solar_rad, ctrl_chiller_on, ctrl_chw_sp, ctrl_zone_sp, start_T_zone)
@@ -187,7 +203,7 @@ class ClosedLoopController:
 
         if comfort_violations > 0 or (simulate_action_failure):
             verification_status = "VERIFIED_FAILURE"
-            rec_action = "RECOVERY_REQUIRED: Revert to Safe Nominal Policy (10.5°C Chiller SP, 23.5°C Zone SP)"
+            rec_action = "RECOVERY_REQUIRED: Discrepancy detected. Reverting plant setpoints to Safe Nominal Baseline Policy (10.5°C Chiller SP, 23.5°C Zone SP)."
             events_log.append({
                 "step": 10,
                 "phase": "Verify",
@@ -217,6 +233,7 @@ class ClosedLoopController:
 
         energy_saved_kwh = baseline_res["total_energy_kwh"] - controlled_res["total_energy_kwh"]
         savings_pct = (energy_saved_kwh / baseline_res["total_energy_kwh"] * 100.0) if baseline_res["total_energy_kwh"] > 0 else 0.0
+
 
         return {
             "scenario_name": scenario_name,
