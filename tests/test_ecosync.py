@@ -396,8 +396,117 @@ class TestEcoSyncAI(unittest.TestCase):
         self.assertEqual(out_heat["verification_status"], "SAFETY_HELD_UNMET_COMFORT")
         self.assertGreater(out_heat["baseline_results"]["comfort_violation_count"], 0)
 
+    def test_controller_all_candidates_rejected_preserves_genuine_baseline(self):
+        """Verify that when all candidates are rejected, actual baseline power and candidate counts are preserved with 0 unearned savings."""
+        from src.simulation.closed_loop_controller import ClosedLoopController
+        loader = KubikLoader()
+        df = loader.load_feature_data()
+        rec_overcool = df.iloc[1500].to_dict() # Zone at 20.19°C
+
+        optimizer = ActionOptimizer()
+        decision = optimizer.select_best_action("KUBIK_HOLISDER", rec_overcool)
+        self.assertEqual(decision["recommendation_status"], "NO_FEASIBLE_ACTION")
+        self.assertIsNone(decision["selected_action"])
+        self.assertEqual(decision["num_candidates_passed"], 0)
+        self.assertEqual(decision["num_candidates_rejected"], 5)
+        self.assertGreater(decision["baseline"]["predicted_power_w"], 0.0) # True baseline is NOT 0.0 W
+
+        ctrl = ClosedLoopController(use_matlab=False)
+        out = ctrl.run_simulation_horizon(rec_overcool, scenario_name="Standard_Cooling_Day", horizon_steps=12, optimizer_decision=decision)
+
+        # Confirm no unearned savings and standby mode
+        self.assertEqual(out["mode"], "NO_FEASIBLE_ACTION_HANDLED")
+        self.assertEqual(out["energy_saved_kwh"], 0.0)
+        self.assertEqual(out["savings_pct"], 0.0)
+        self.assertEqual(out["decision"]["num_candidates_passed"], 0)
+        self.assertEqual(out["decision"]["num_candidates_rejected"], 5)
+        self.assertEqual(out["decision"]["baseline"]["predicted_power_w"], decision["baseline"]["predicted_power_w"])
+        # Baseline simulated energy must be physical positive energy, separate from intervention savings
+        self.assertGreater(out["baseline_results"]["total_energy_kwh"], 0.0)
+
+    def test_controller_feasible_action_applies_setpoints_and_integrates_energy(self):
+        """Verify that a feasible candidate's setpoints are dispatched and energy savings calculated from actual trajectories."""
+        from src.simulation.closed_loop_controller import ClosedLoopController
+        loader = KubikLoader()
+        df = loader.load_feature_data()
+        rec_active = df.iloc[650].to_dict() # Active cooling at 23.18°C
+
+        optimizer = ActionOptimizer()
+        decision = optimizer.select_best_action("KUBIK_HOLISDER", rec_active)
+        self.assertEqual(decision["recommendation_status"], "FEASIBLE_ACTION_RECOMMENDED")
+        self.assertIsNotNone(decision["selected_action"])
+
+        ctrl = ClosedLoopController(use_matlab=False)
+        out = ctrl.run_simulation_horizon(rec_active, scenario_name="Standard_Cooling_Day", horizon_steps=12, optimizer_decision=decision)
+
+        self.assertEqual(out["mode"], "AUTONOMOUS_CLOSED_LOOP")
+        self.assertEqual(out["verification_status"], "VERIFIED_SUCCESS")
+        b_kwh = out["baseline_results"]["total_energy_kwh"]
+        c_kwh = out["controlled_results"]["total_energy_kwh"]
+        expected_saved_kwh = round(b_kwh - c_kwh, 3)
+        self.assertEqual(out["energy_saved_kwh"], expected_saved_kwh)
+        self.assertGreater(out["energy_saved_kwh"], 0.0)
+        expected_savings_pct = round(expected_saved_kwh / b_kwh * 100.0, 1)
+        self.assertEqual(out["savings_pct"], expected_savings_pct)
+
+    def test_controller_intercepts_accidentally_supplied_rejected_candidate(self):
+        """Verify that a rejected candidate supplied accidentally to the controller is blocked and never dispatched."""
+        from src.simulation.closed_loop_controller import ClosedLoopController
+        loader = KubikLoader()
+        df = loader.load_feature_data()
+        rec = df.iloc[650].to_dict()
+
+        # Supply an unsafe candidate (chiller SP 6.0°C and flagged unsafe)
+        unsafe_cand = {
+            "candidate": {
+                "action_id": "ACCIDENTAL_UNSAFE_CANDIDATE",
+                "name": "Accidental Unsafe 6C Action",
+                "chiller1_sp": 6.0,
+                "fc1_sp": 23.0,
+                "chiller1_order": 1
+            },
+            "is_safe": False,
+            "safety_violations": ["Chilled water limit violated: 6.0°C outside [7.0, 14.0]"],
+            "predicted_power_w": 500.0
+        }
+
+        ctrl = ClosedLoopController(use_matlab=False)
+        out = ctrl.run_simulation_horizon(rec, scenario_name="Standard_Cooling_Day", horizon_steps=12, selected_candidate=unsafe_cand)
+
+        # Controller must intercept the unsafe candidate, refuse dispatch, hold baseline, and report zero savings
+        self.assertEqual(out["mode"], "NO_FEASIBLE_ACTION_HANDLED")
+        self.assertEqual(out["energy_saved_kwh"], 0.0)
+        self.assertEqual(out["savings_pct"], 0.0)
+        self.assertIsNone(out["decision"]["selected_action"])
+        self.assertIn("Safety Intercept", out["decision"]["status_message"])
+
+    def test_actual_trajectories_baseline_energy_and_savings_integration(self):
+        """Verify that baseline energy and savings are computed directly from trajectory time integrals."""
+        from src.simulation.closed_loop_controller import ClosedLoopController
+        loader = KubikLoader()
+        df = loader.load_feature_data()
+        rec = df.iloc[650].to_dict()
+
+        ctrl = ClosedLoopController(use_matlab=False)
+        out = ctrl.run_simulation_horizon(rec, scenario_name="Standard_Cooling_Day", horizon_steps=12)
+
+        b_pow = np.array(out["baseline_results"]["chiller_power_w"])
+        c_pow = np.array(out["controlled_results"]["chiller_power_w"])
+        dt_hours = 600.0 / 3600.0 # 10 min in hours
+
+        integrated_b_kwh = round(float(np.sum(b_pow * dt_hours) / 1000.0), 3)
+        integrated_c_kwh = round(float(np.sum(c_pow * dt_hours) / 1000.0), 3)
+        integrated_saved_kwh = round(integrated_b_kwh - integrated_c_kwh, 3)
+
+        self.assertEqual(out["baseline_results"]["total_energy_kwh"], integrated_b_kwh)
+        self.assertEqual(out["controlled_results"]["total_energy_kwh"], integrated_c_kwh)
+        self.assertEqual(out["energy_saved_kwh"], integrated_saved_kwh)
+        expected_savings_pct = round(integrated_saved_kwh / integrated_b_kwh * 100.0, 1)
+        self.assertEqual(out["savings_pct"], expected_savings_pct)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

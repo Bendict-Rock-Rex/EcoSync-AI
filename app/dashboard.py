@@ -287,23 +287,45 @@ st.sidebar.caption(f"**Sampling Cadence:** {meta.cadence_min:.0f} min | Records:
 st.sidebar.divider()
 
 st.sidebar.caption("OPERATING PRESET & TIMESTEP")
+if is_kubik:
+    preset_options = [
+        "Representative Active Cooling Window (Row 650 — Recommended Demo)",
+        "Overcooling Safety Demonstration (Row 1500 — Constraint Lockout)",
+        "Peak Tariff Operating Window (Row 1820)",
+        "High Thermal Load Window (Row 2650)",
+        "Off-Peak / Low-Occupancy Condition (Row 840)"
+    ]
+    preset_indices = {
+        "Representative Active Cooling Window (Row 650 — Recommended Demo)": 650,
+        "Overcooling Safety Demonstration (Row 1500 — Constraint Lockout)": 1500,
+        "Peak Tariff Operating Window (Row 1820)": 1820,
+        "High Thermal Load Window (Row 2650)": 2650,
+        "Off-Peak / Low-Occupancy Condition (Row 840)": 840,
+    }
+else:
+    preset_options = [
+        "Representative Commercial Operating Window (Row 2000)",
+        "High Thermal Load Window (Row 3200)",
+        "Peak Tariff Operating Window (Row 4100)",
+        "Off-Peak / Low-Occupancy Condition (Row 1250)"
+    ]
+    preset_indices = {
+        "Representative Commercial Operating Window (Row 2000)": 2000,
+        "High Thermal Load Window (Row 3200)": 3200,
+        "Peak Tariff Operating Window (Row 4100)": 4100,
+        "Off-Peak / Low-Occupancy Condition (Row 1250)": 1250,
+    }
+
+default_preset_idx = 0
+if "demo" in st.query_params and st.query_params["demo"] == "overcool":
+    default_preset_idx = 1 if is_kubik else 0
+
 preset_name = st.sidebar.selectbox(
     "Operating Profile",
-    options=[
-        "Standard Operation Observation",
-        "High Thermal Load Window",
-        "Peak Tariff Operating Window",
-        "Off-Peak / Low-Occupancy Condition"
-    ],
+    options=preset_options,
+    index=default_preset_idx,
     label_visibility="collapsed"
 )
-
-preset_indices = {
-    "Standard Operation Observation": 1500,
-    "High Thermal Load Window": 2650 if is_kubik else 3200,
-    "Peak Tariff Operating Window": 1820 if is_kubik else 4100,
-    "Off-Peak / Low-Occupancy Condition": 840 if is_kubik else 1250,
-}
 
 time_index = st.sidebar.slider(
     f"Timestep Index (0 to {len(active_df)-1:,})",
@@ -479,7 +501,7 @@ if nav_section == "Executive Workflow Console":
         with f1:
             st.markdown(f"""
             <div class="scada-card">
-                <div class="scada-label">Historical Observation</div>
+                <div class="scada-label">Historical Observation (t)</div>
                 <div class="scada-val">{actual_power_w:.1f} W</div>
                 <div class="scada-sub">Ground Truth Measurement</div>
             </div>
@@ -487,7 +509,7 @@ if nav_section == "Executive Workflow Console":
         with f2:
             st.markdown(f"""
             <div class="scada-card">
-                <div class="scada-label">Surrogate Forecast (10-min)</div>
+                <div class="scada-label">Surrogate Forecast (t+10m)</div>
                 <div class="scada-val val-cyan">{predicted_power_w:.1f} W</div>
                 <div class="scada-sub">Residual: {residual_w:+.1f} W | Uncertainty: ±{rmse_w:.1f} W</div>
             </div>
@@ -495,11 +517,12 @@ if nav_section == "Executive Workflow Console":
         with f3:
             st.markdown(f"""
             <div class="scada-card">
-                <div class="scada-label">Surrogate Performance</div>
+                <div class="scada-label">Surrogate Metrics (vs Persistence)</div>
                 <div class="scada-val">R² = {explainer.metrics.get('r2_score', 0.355):.3f}</div>
-                <div class="scada-sub">MAE: ±{explainer.metrics.get('mae_watts', 305):.1f} W on Chronological Holdout</div>
+                <div class="scada-sub">MAE: ±{explainer.metrics.get('mae_watts', 305):.1f} W (Persistence Benchmark: 172.9 W)</div>
             </div>
             """, unsafe_allow_html=True)
+
     else:
         model_occ = lbnl_bundle["model_with_occ"]
         occ_feats = lbnl_bundle["occ_features"]
@@ -616,18 +639,135 @@ if nav_section == "Executive Workflow Console":
         df_comp = pd.DataFrame(comp_rows)
         st.dataframe(df_comp, use_container_width=True, hide_index=True)
 
-    # 9. PERFORMANCE & INVARIANT VERIFICATION
-    st.markdown("##### 9. Performance & Invariant Verification")
+    # 9. PERFORMANCE & INVARIANT VERIFICATION & DIGITAL-TWIN SIMULATION
+    st.markdown("##### 9. Digital-Twin Closed-Loop Simulation & Verification")
     if is_kubik:
         v_snap = monitor.verify_telemetry(current_row)
         st.markdown(f"""
-        <div style="background: #1E293B; border: 1px solid #334155; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem;">
+        <div style="background: #1E293B; border: 1px solid #334155; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; margin-bottom: 12px;">
             <b>Operational Health Status:</b> <span class="tag-pass">{v_snap['status']}</span> | Active Invariant Violations: <b>{v_snap['anomalies_detected']}</b>
             <div style="color: #94A3B8; margin-top: 4px;">
                 Grid Voltage: {v_snap['metrics']['grid_voltage_v']} V (Nominal 400V) • Chiller 1 |PF|: {v_snap['metrics']['power_factor_abs']:.2f} (Limit ≥ 0.65) • Zone Temp: {v_snap['metrics']['zone1_temp_degc']} °C [21.0, 26.0]
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+        # Run closed-loop horizon verification (12 steps = 2 hours) on the current observation
+        ctrl = ClosedLoopController(use_matlab=False)
+        horizon_sim = ctrl.run_simulation_horizon(
+            initial_record=current_row,
+            scenario_name="Standard_Cooling_Day",
+            horizon_steps=12,
+            apply_optimization=True,
+            optimizer_decision=decision
+        )
+
+        b_sim = horizon_sim["baseline_results"]
+        c_sim = horizon_sim["controlled_results"]
+        ver_stat = horizon_sim.get("verification_status", "VERIFIED_SUCCESS")
+        scen_name = horizon_sim.get("scenario_name", "Standard_Cooling_Day")
+
+        b_kwh = float(b_sim.get("total_energy_kwh", 0.0))
+        c_kwh = float(c_sim.get("total_energy_kwh", 0.0))
+        saved_kwh = round(b_kwh - c_kwh, 3) if selected is not None else 0.0
+        dyn_savings_pct = round((saved_kwh / b_kwh * 100.0), 1) if (b_kwh > 0.0 and selected is not None) else 0.0
+
+        if selected is None:
+            # Standby mode: 0 feasible actions chosen by supervisory safety gate
+            sv1, sv2, sv3 = st.columns(3)
+            with sv1:
+                st.markdown(f"""
+                <div class="scada-card">
+                    <div class="scada-label">Baseline Simulated Energy</div>
+                    <div class="scada-val">{b_kwh:.3f} kWh</div>
+                    <div class="scada-sub">Scenario: {scen_name} • Constant Baseline Hold</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with sv2:
+                st.markdown(f"""
+                <div class="scada-card" style="border-left: 4px solid #EF4444;">
+                    <div class="scada-label" style="color: #F87171;">Plant Twin Operating Mode</div>
+                    <div class="scada-val" style="color: #FCA5A5;">Standby</div>
+                    <div class="scada-sub">No Intervention Dispatched • Safety Lockout Active</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with sv3:
+                st.markdown(f"""
+                <div class="scada-card">
+                    <div class="scada-label">Verification Outcome ({scen_name})</div>
+                    <div class="scada-val" style="color: #94A3B8;">0.0% Energy Saved</div>
+                    <div class="scada-sub">Status: <span class="tag-fail">SAFETY_HELD_NO_ACTION</span> (0.000 kWh saved)</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown(f"""
+            <div style="background: #1C131D; border: 1px solid #7F1D1D; border-left: 4px solid #EF4444; padding: 12px 16px; border-radius: 6px; font-size: 0.85rem; margin-top: 10px;">
+                <b>Digital Twin Standby Confirmation:</b> The digital twin received initial state <code>T_zone = {current_row.get(settings.FANCOIL_TAGS['fc1_zone_temp'], 20.2):.1f}°C</code>. 
+                Because all candidate actions violate operating constraints (e.g., overcooling below 21.0°C), no setpoint modifications were dispatched to the plant. 
+                The system reports <b>0.0 W demand cut and 0.000 kWh savings</b> from non-applied interventions, maintaining complete consistency between the recommendation card and physical simulation.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            sv1, sv2, sv3 = st.columns(3)
+            with sv1:
+                st.markdown(f"""
+                <div class="scada-card">
+                    <div class="scada-label">Baseline Simulated Energy</div>
+                    <div class="scada-val">{b_kwh:.3f} kWh</div>
+                    <div class="scada-sub">Scenario: {scen_name} • Constant Setpoint (Peak: {b_sim['peak_power_w']:.0f} W)</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with sv2:
+                st.markdown(f"""
+                <div class="scada-card">
+                    <div class="scada-label">Controlled Simulated Energy</div>
+                    <div class="scada-val val-emerald">{c_kwh:.3f} kWh</div>
+                    <div class="scada-sub">Intervention: {selected['candidate']['name']} (Peak: {c_sim['peak_power_w']:.0f} W)</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with sv3:
+                st.markdown(f"""
+                <div class="scada-card">
+                    <div class="scada-label">Verification Outcome ({scen_name})</div>
+                    <div class="scada-val val-cyan">{dyn_savings_pct:.1f}% Energy Saved</div>
+                    <div class="scada-sub">({b_kwh:.3f} - {c_kwh:.3f}) / {b_kwh:.3f} • Saved {saved_kwh:.3f} kWh ({ver_stat})</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # Compact Side-by-Side Trajectories
+            t_axis = [s * 10 for s in range(len(b_sim["T_zone_degc"]))]
+            traj_df = pd.DataFrame({
+                "Time (min)": t_axis,
+                "Baseline Zone Temp (°C)": b_sim["T_zone_degc"],
+                "Controlled Zone Temp (°C)": c_sim["T_zone_degc"],
+                "Baseline Chiller Power (W)": b_sim["chiller_power_w"],
+                "Controlled Chiller Power (W)": c_sim["chiller_power_w"],
+            })
+
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                c_temp = alt.Chart(traj_df).transform_fold(
+                    ["Baseline Zone Temp (°C)", "Controlled Zone Temp (°C)"],
+                    as_=["Trajectory", "Temperature (°C)"]
+                ).mark_line(strokeWidth=2.2).encode(
+                    x=alt.X("Time (min):Q", title="Elapsed Simulation Time (min)"),
+                    y=alt.Y("Temperature (°C):Q", scale=alt.Scale(domain=[21.0, 27.0]), title="Zone Air Temp (°C)"),
+                    color=alt.Color("Trajectory:N", scale=alt.Scale(range=["#F59E0B", "#10B981"])),
+                    tooltip=["Time (min):Q", "Trajectory:N", "Temperature (°C):Q"]
+                ).properties(height=230, title="Simulated Zone Temperature: Baseline vs Controlled")
+                st.altair_chart(apply_dark_chart(c_temp), use_container_width=True)
+
+            with col_t2:
+                c_pow = alt.Chart(traj_df).transform_fold(
+                    ["Baseline Chiller Power (W)", "Controlled Chiller Power (W)"],
+                    as_=["Trajectory", "Power (W)"]
+                ).mark_line(strokeWidth=2.2).encode(
+                    x=alt.X("Time (min):Q", title="Elapsed Simulation Time (min)"),
+                    y=alt.Y("Power (W):Q", title="Chiller Active Power (W)"),
+                    color=alt.Color("Trajectory:N", scale=alt.Scale(range=["#F59E0B", "#10B981"])),
+                    tooltip=["Time (min):Q", "Trajectory:N", "Power (W):Q"]
+                ).properties(height=230, title="Simulated Active Power Demand: Baseline vs Controlled")
+                st.altair_chart(apply_dark_chart(c_pow), use_container_width=True)
     else:
         st.markdown("""
         <div style="background: #1E293B; border: 1px solid #334155; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem;">
@@ -637,6 +777,7 @@ if nav_section == "Executive Workflow Console":
             </div>
         </div>
         """, unsafe_allow_html=True)
+
 
 
 # =============================================================
@@ -844,7 +985,8 @@ elif nav_section == "Autonomous Digital Twin & Closed-Loop Control":
     # Execute Closed-Loop Controller
     controller = ClosedLoopController(use_matlab=use_mat)
     test_rec = current_row.copy()
-    test_rec[settings.FANCOIL_TAGS["fc1_zone_temp"]] = 23.5 # Standard neutral starting condition
+    if settings.FANCOIL_TAGS["fc1_zone_temp"] not in test_rec or np.isnan(test_rec.get(settings.FANCOIL_TAGS["fc1_zone_temp"], np.nan)):
+        test_rec[settings.FANCOIL_TAGS["fc1_zone_temp"]] = 23.5
 
     is_fail = (sim_mode == "Ineffective / Malfunctioning Action")
     is_nofeas = (sim_mode == "Severe Stress (No Feasible Action)")
@@ -862,14 +1004,19 @@ elif nav_section == "Autonomous Digital Twin & Closed-Loop Control":
     # Verification Badge
     st.markdown("##### 2. Closed-Loop Performance & Verification Result")
     ver_status = loop_res.get("verification_status", "BASELINE")
+    b_energy = float(loop_res.get("baseline_results", {}).get("total_energy_kwh", 0.0))
+    c_energy = float(loop_res.get("controlled_results", {}).get("total_energy_kwh", 0.0))
+    dyn_saved_kwh = round(b_energy - c_energy, 3) if ver_status == "VERIFIED_SUCCESS" else 0.0
+    dyn_pct = round((dyn_saved_kwh / b_energy * 100.0), 1) if (b_energy > 0 and ver_status == "VERIFIED_SUCCESS") else 0.0
+
     if ver_status == "VERIFIED_SUCCESS":
-        st.success(f"✅ **CLOSED-LOOP VERIFICATION: SUCCESS** | Power error: {loop_res.get('power_prediction_error_pct', 0.0):.1f}% | Energy Saved: {loop_res.get('energy_saved_kwh', 0.0):.2f} kWh ({loop_res.get('savings_pct', 0.0)}%) | 0 Comfort Breaches")
+        st.success(f"✅ **CLOSED-LOOP VERIFICATION: SUCCESS** | Scenario: `{sim_scenario}` ({horizon_hours}h horizon) | Baseline: `{b_energy:.3f} kWh` → Controlled: `{c_energy:.3f} kWh` | Dynamic Savings: **{dyn_pct:.1f}%** ({dyn_saved_kwh:.3f} kWh saved) | Power error: {loop_res.get('power_prediction_error_pct', 0.0):.1f}% | 0 Comfort Breaches")
     elif ver_status == "VERIFIED_FAILURE":
-        st.error(f"⚠️ **CLOSED-LOOP VERIFICATION: FAILED — RECOVERY ACTIVATED** | Plant response diverged from expected bounds. Supervisory controller triggered automatic rollback to Safe Nominal Setpoints.")
-    elif ver_status == "SAFETY_HELD_NO_ACTION":
-        st.warning(f"🛡️ **SAFETY LOCKOUT: NO FEASIBLE ACTION** | All proposed interventions violate safety boundaries under extreme stress. Baseline held at 0.0% false energy savings.")
+        st.error(f"⚠️ **CLOSED-LOOP VERIFICATION: FAILED — RECOVERY ACTIVATED** | Scenario: `{sim_scenario}` | Plant response diverged from expected bounds. Supervisory controller triggered automatic rollback to Safe Nominal Setpoints.")
+    elif ver_status in ["SAFETY_HELD_NO_ACTION", "SAFETY_HELD_UNMET_COMFORT"]:
+        st.warning(f"🛡️ **SAFETY LOCKOUT: NO FEASIBLE ACTION** | Scenario: `{sim_scenario}` | All proposed interventions violate safety boundaries under current thermal state. Baseline held at 0.0% false energy savings (0.000 kWh saved).")
     else:
-        st.info(f"ℹ️ **BASELINE UNCONTROLLED RUN** | Constant setpoint hold without supervisory optimization.")
+        st.info(f"ℹ️ **BASELINE UNCONTROLLED RUN** | Scenario: `{sim_scenario}` | Constant setpoint hold without supervisory optimization.")
 
     # Side-by-side Trajectory Charts
     st.markdown("##### 3. Simulated Plant Trajectory vs Baseline")

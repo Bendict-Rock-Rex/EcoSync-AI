@@ -16,7 +16,7 @@ Executes the mandatory 11-stage autonomous control loop:
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 import sys
 
@@ -48,7 +48,10 @@ class ClosedLoopController:
         horizon_steps: int = 12, # 12 x 10 min = 2 hours
         apply_optimization: bool = True,
         simulate_action_failure: bool = False,
-        simulate_no_feasible: bool = False
+        simulate_no_feasible: bool = False,
+        optimizer_decision: Optional[Dict[str, Any]] = None,
+        selected_candidate: Optional[Dict[str, Any]] = None,
+        recommendation_status: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Executes a closed-loop horizon run.
@@ -99,19 +102,59 @@ class ClosedLoopController:
                 }]
             }
 
-        # 2. Execute Autonomous Decision Pipeline on Initial State
-        current_state = dict(initial_record)
-        current_state[settings.WEATHER_TAGS["outdoor_temp"]] = float(T_amb[0])
-        current_state[settings.WEATHER_TAGS["solar_radiation"]] = float(solar_rad[0])
+        # 2. Resolve Optimization & Supervisory Decision
+        if optimizer_decision is not None:
+            # Pass through the genuine upstream optimizer decision directly
+            opt_selection = dict(optimizer_decision)
+            selected_cand = opt_selection.get("selected_action")
+            rec_status = opt_selection.get("recommendation_status", "FEASIBLE_ACTION_RECOMMENDED" if selected_cand is not None else "NO_FEASIBLE_ACTION")
+        elif selected_candidate is not None or (recommendation_status == "NO_FEASIBLE_ACTION" and not simulate_no_feasible):
+            selected_cand = selected_candidate
+            rec_status = recommendation_status or ("FEASIBLE_ACTION_RECOMMENDED" if selected_cand is not None else "NO_FEASIBLE_ACTION")
+            cand_info = selected_cand.get("candidate", selected_cand) if selected_cand is not None else {}
+            pred_p = selected_cand.get("predicted_power_w", 0.0) if selected_cand is not None else 0.0
+            opt_selection = {
+                "dataset_id": "KUBIK_HOLISDER",
+                "power_unit": "W",
+                "selected_action": selected_cand,
+                "baseline": {"predicted_power_w": pred_p},
+                "num_candidates_evaluated": 1 if selected_cand is not None else 0,
+                "num_candidates_passed": 1 if selected_cand is not None else 0,
+                "num_candidates_rejected": 0,
+                "status_message": f"Candidate action evaluated: {cand_info.get('name', 'Direct Intervention')}" if selected_cand is not None else "NO FEASIBLE ACTION"
+            }
+        else:
+            current_state = dict(initial_record)
+            current_state[settings.WEATHER_TAGS["outdoor_temp"]] = float(T_amb[0])
+            current_state[settings.WEATHER_TAGS["solar_radiation"]] = float(solar_rad[0])
 
-        if simulate_no_feasible:
-            # Inject extreme state where all candidates are rejected
-            current_state[settings.FANCOIL_TAGS["fc1_zone_temp"]] = 28.5
-            current_state[settings.WEATHER_TAGS["outdoor_temp"]] = 42.0
+            if simulate_no_feasible:
+                # Inject extreme state where all candidates are rejected
+                current_state[settings.FANCOIL_TAGS["fc1_zone_temp"]] = 28.5
+                current_state[settings.WEATHER_TAGS["outdoor_temp"]] = 42.0
 
-        opt_selection = self.optimizer.select_best_action("KUBIK_HOLISDER", current_state)
-        selected_cand = opt_selection.get("selected_action")
-        rec_status = opt_selection.get("recommendation_status")
+            opt_selection = self.optimizer.select_best_action("KUBIK_HOLISDER", current_state)
+            selected_cand = opt_selection.get("selected_action")
+            rec_status = opt_selection.get("recommendation_status")
+
+        # 2b. Supervisory Safety Gate: Intercept any unvalidated or rejected candidates
+        if selected_cand is not None:
+            is_cand_safe = bool(selected_cand.get("is_safe", True))
+            safety_violations = list(selected_cand.get("safety_violations", []))
+            cand_data_check = selected_cand.get("candidate", selected_cand)
+
+            # Validate physical boundaries
+            chw_sp_check = float(cand_data_check.get("chiller1_sp", 10.5))
+            if chw_sp_check < settings.SAFETY_BOUNDS["chiller_sp_min"] or chw_sp_check > settings.SAFETY_BOUNDS["chiller_sp_max"]:
+                is_cand_safe = False
+                safety_violations.append(f"Chilled water setpoint {chw_sp_check:.1f}°C violates safety bounds [{settings.SAFETY_BOUNDS['chiller_sp_min']}, {settings.SAFETY_BOUNDS['chiller_sp_max']}]")
+
+            if not is_cand_safe or len(safety_violations) > 0:
+                rejection_msg = "; ".join(safety_violations) if safety_violations else selected_cand.get("rejection_reason", "Safety constraint violation")
+                rec_status = "REJECTED_ACTION_BLOCKED"
+                opt_selection["selected_action"] = None
+                opt_selection["status_message"] = f"Supervisory Safety Intercept: Disallowed rejected candidate ({rejection_msg})"
+                selected_cand = None
 
         events_log = [
             {"step": 1, "phase": "Sense/Data Collection", "status": "COMPLETED", "detail": f"Telemetry acquired: T_amb={T_amb[0]:.1f}°C, Solar={solar_rad[0]:.0f}W/m2"},
@@ -124,10 +167,13 @@ class ClosedLoopController:
             {"step": 8, "phase": "Optimize/Best Action", "status": "COMPLETED", "detail": opt_selection["status_message"]},
         ]
 
-        if selected_cand is None or rec_status == "NO_FEASIBLE_ACTION":
+        if selected_cand is None or rec_status in ["NO_FEASIBLE_ACTION", "REJECTED_ACTION_BLOCKED"]:
             # Safety gate held: Maintain baseline operation, report unmet constraints honestly
             baseline_violations = baseline_res.get("comfort_violation_count", 0)
-            if baseline_violations > 0:
+            if rec_status == "REJECTED_ACTION_BLOCKED":
+                feas_detail = "Supplied candidate rejected by controller safety validation. Disallowing plant actuation and holding safe baseline."
+                ver_status = "SAFETY_HELD_NO_ACTION"
+            elif baseline_violations > 0:
                 feas_detail = f"All optimization candidates rejected. Zone has {baseline_violations} comfort violations (>26.0°C) under severe ambient load. Baseline maintained under distress; emergency capacity limit reached."
                 ver_status = "SAFETY_HELD_UNMET_COMFORT"
             else:
@@ -143,14 +189,14 @@ class ClosedLoopController:
             events_log.append({
                 "step": 10,
                 "phase": "Verify",
-                "status": "ABORTED",
-                "detail": "Intervention bypassed due to zero feasible candidates. Comfort constraint unmet under current equipment capacity."
+                "status": "STANDBY",
+                "detail": "Intervention bypassed due to zero feasible candidates or blocked unsafe action. Plant maintained at safe baseline."
             })
             events_log.append({
                 "step": 11,
                 "phase": "Learn & Update",
                 "status": "COMPLETED",
-                "detail": "Recorded infeasibility and capacity saturation event in supervisory diagnostic log."
+                "detail": "Recorded infeasibility and safety gate lockout event in supervisory diagnostic log."
             })
             return {
                 "scenario_name": scenario_name,
@@ -231,9 +277,10 @@ class ClosedLoopController:
                 "detail": f"Model tracking error ({power_error_pct:.1f}%) logged. Digital twin weights validated within acceptable 15% tolerance."
             })
 
-        energy_saved_kwh = baseline_res["total_energy_kwh"] - controlled_res["total_energy_kwh"]
-        savings_pct = (energy_saved_kwh / baseline_res["total_energy_kwh"] * 100.0) if baseline_res["total_energy_kwh"] > 0 else 0.0
-
+        b_kwh = float(baseline_res["total_energy_kwh"])
+        c_kwh = float(controlled_res["total_energy_kwh"])
+        energy_saved_kwh = round(b_kwh - c_kwh, 3)
+        savings_pct = round((energy_saved_kwh / b_kwh * 100.0), 1) if b_kwh > 0 else 0.0
 
         return {
             "scenario_name": scenario_name,
@@ -242,8 +289,8 @@ class ClosedLoopController:
             "decision": opt_selection,
             "baseline_results": baseline_res,
             "controlled_results": controlled_res,
-            "energy_saved_kwh": round(energy_saved_kwh, 3),
-            "savings_pct": round(savings_pct, 1),
+            "energy_saved_kwh": energy_saved_kwh,
+            "savings_pct": savings_pct,
             "verification_status": verification_status,
             "power_prediction_error_pct": round(power_error_pct, 1),
             "events_log": events_log
